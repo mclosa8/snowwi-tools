@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """
     Real aperture field processing for SNOWWI. 
 
@@ -22,10 +24,10 @@ from multiprocessing import Pool
 from pprint import PrettyPrinter
 pp = PrettyPrinter()
 
-from snowwi.file_handling import read_and_reshape, list_files_from_dir, combine_results, read_and_compress_local
-from snowwi.params import get_band_params_4x2, get_band_params
-from snowwi.ra.radar_processing import filter_and_compress
-from snowwi.utils import make_chirp_dict
+from snowwi_lite.file_handling import read_and_reshape, list_files_from_dir, combine_results
+from snowwi_lite.params import get_band_params_4x2, get_band_params
+from snowwi_lite.ra.radar_processing import filter_and_compress
+from snowwi_lite.utils import make_chirp_dict
 
 from scipy.constants import speed_of_light
 
@@ -232,7 +234,7 @@ def main():
             plt.imshow(20*np.log10(abs(rc)), cmap='gray', origin='upper',
                        vmin=CLIMS[chan][0], vmax=CLIMS[chan][1],
                        extent=[sr[0], sr[1], flight_time[-1], flight_time[0]],
-                       aspect=1/(5*im_ratio))
+                       aspect=.5e3)
             plt.title(f"RC image - Band: {band} - Channel: {chan} - ({args.process_from}, {args.process_from + args.num_files})")
             plt.colorbar()
             plt.xlabel('Slant range (m)')

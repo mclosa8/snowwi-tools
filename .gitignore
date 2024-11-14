@@ -5,7 +5,7 @@ __pycache__/
 .vscode/
 .idea/
 build/
-simulator.egg-info/
+snowwi_lite.egg-info/
 
 # Configuration file
 *.cfg
