@@ -1,0 +1,12 @@
+name: snowwi-lite
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11.*
+  - bottleneck
+  - matplotlib
+  - numpy
+  - pyproj
+  - scipy
+  - pip

@@ -1,0 +1,11 @@
+# IGNORE THESE FILES
+
+# Directories
+__pycache__/
+.vscode/
+.idea/
+build/
+simulator.egg-info/
+
+# Configuration file
+*.cfg
