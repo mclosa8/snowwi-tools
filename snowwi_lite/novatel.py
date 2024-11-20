@@ -28,12 +28,18 @@ def read_novatel(file_path, skiprows=18, column_names=None):
             "Undulation", "X-ECEF", "Y-ECEF", "Z-ECEF",
             "Pitch", "Roll", "Heading", "GPSCOG"
         ]
-    return pd.read_csv(
+    df = pd.read_csv(
         file_path,
         skiprows=skiprows,  # Adjust this based on the number of lines in the metadata
         delim_whitespace=True,
-        names=column_names
+        names=column_names,
+        low_memory=False
     )
+
+    df['GPSSeconds'] = pd.to_numeric(df['GPSSeconds'], errors='coerce')
+    df['Week'] = pd.to_numeric(df['Week'], errors='coerce')
+
+    return df
 
 
 def get_ecef(novatel, start_idx=0, end_idx=-1):
@@ -180,6 +186,7 @@ def get_velocities(ecef, times):
 
     return v_interp, v_mags
 
+
 def novatel_to_dict(novatel_file):
     raw = np.loadtxt(novatel_file, skiprows=15, dtype=str,
                      usecols=(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13))
@@ -194,6 +201,3 @@ def novatel_to_dict(novatel_file):
         }
 
     return novatel_dict
-
-
-

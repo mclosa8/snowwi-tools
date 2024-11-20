@@ -6,9 +6,10 @@ Author: Marc Closa Tarres (MCT)
 Changelog:
     - v0: No13, 2024 - MCT
 """
+import numpy as np
+import pandas as pd
 
 import re
-
 
 def atoi(text): return int(text) if text.isdigit() else text
 
@@ -26,3 +27,9 @@ def make_chirp_dict(f0, f_l, f_h, tp, chirp_type, fs):
         'chirp_type': chirp_type,
         'fs': fs
     }
+
+def read_spreadsheet(flightline_xl, sheet_name, maxcols=11):
+    with pd.ExcelFile(flightline_xl) as xls:
+        df = pd.read_excel(xls, sheet_name, skiprows=1, usecols=np.arange(maxcols))
+    print(df.keys())
+    return df

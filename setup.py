@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 if __name__ == '__main__':
     setup(
-        name='snowwi-lite',
+        name='snowwi_lite',
         version='0.1',
         author='Marc Closa',
         packages=find_packages(),
