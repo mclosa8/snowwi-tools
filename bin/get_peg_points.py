@@ -12,7 +12,7 @@
 """
 
 from snowwi_lite.utils import read_spreadsheet, natural_keys
-from snowwi_lite.novatel import read_novatel, get_llh
+from snowwi_lite.novatel import read_novatel, get_llh, get_cog
 import numpy as np
 import pandas as pd
 
@@ -113,11 +113,18 @@ def main():
 
             # Retrieve ECEF coordinates
             llh = get_llh(flightline)
+            print(llh.shape)
+            cog_heading = get_cog(flightline)
+            print(cog_heading.shape)
+
+            # And we column_stack llh and cog so the final tuple is (lat, lon, hei, cog_heading)
+            llh = np.vstack((llh, cog_heading))
+            print(llh.shape)
 
             # Calculate PEG point
             peg = np.mean(llh, axis=1)
             print(peg.shape)
-            print(f'PEG point (llh): {peg}')
+            print(f'PEG point (llhh): {peg}')
             if not np.nan in peg:
                 print('Appending...')
                 fl_date[fl_id].append(peg)
@@ -148,9 +155,9 @@ def main():
 
     # Finally, we write the dict to file
     with open(f'pegs_{args.campaign.lower()}.txt', 'w') as f:
-        f.write(f'Flightline_ID    PEG_LAT(m)    PEG_LON(m)    PEG_H-ELL(m)\n')
+        f.write(f'Flightline_ID    PEG_LAT(deg)    PEG_LON(deg)    PEG_H-ELL(m)    PEG-Heading(deg)\n')
         for key, value in flightline_dict.items():
-            f.write(f'{key}    {value[0]}    {value[1]}    {value[2]}\n')
+            f.write(f'{key}    {value[0]}    {value[1]}    {value[2]}    {value[3]}\n')
 
 
 if __name__ == "__main__":

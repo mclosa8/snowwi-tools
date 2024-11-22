@@ -201,3 +201,14 @@ def novatel_to_dict(novatel_file):
         }
 
     return novatel_dict
+
+
+# TDBP uses by default line heading in the positive interval [0, 360].
+def get_cog(novatel, non_causal=False):
+    cog = novatel['GPSCOG'].to_numpy() # COG by default is [0, 360].
+    print(type(cog))
+    if non_causal: # Normalize cog to [-180, 180] interval
+        cog = np.array(
+            [cog_i if cog_i < 180 else cog_i - 360 for cog_i in cog]
+        )
+    return cog

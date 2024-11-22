@@ -9,3 +9,6 @@ snowwi_lite.egg-info/
 
 # Configuration file
 *.cfg
+
+# Output products
+pegs_march.txt
