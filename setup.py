@@ -1,6 +1,5 @@
 import glob
 import yaml
-
 from setuptools import setup, find_packages
 
 def parse_environment_yml(file_path="env/environment.yml"):
@@ -20,23 +19,23 @@ def parse_environment_yml(file_path="env/environment.yml"):
     return dependencies
 
 setup(
-    name="snowwi-tools",
+    name="snowwi_tools",
     version="0.1.0",
     author="Marc Closa Tarres (MCT)",
-    author_email="your.email@example.com",
+    author_email="mclosatarres@umass.edu",
     description="A collection of tools for SNOWWI processing and data handling.",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/mclosa8/snowwi-tools",  # Replace with the actual repo URL if available
-    packages=find_packages(where="snowwi_tools"),
-    package_dir={"": "."},
+    url="https://github.com/mclosa8/snowwi-tools",
+    packages=find_packages(),
     scripts=glob.glob('bin/*.py'),
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.11",
+    python_requires=">=3.10",
     install_requires=parse_environment_yml(),
-    include_package_data=True,
+    include_package_data=True
 )
+

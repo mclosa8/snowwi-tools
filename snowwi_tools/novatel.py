@@ -31,7 +31,7 @@ def read_novatel(file_path, skiprows=18, column_names=None):
     df = pd.read_csv(
         file_path,
         skiprows=skiprows,  # Adjust this based on the number of lines in the metadata
-        delim_whitespace=True,
+        sep='\s+',
         names=column_names,
         low_memory=False
     )
