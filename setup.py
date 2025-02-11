@@ -1,22 +1,5 @@
 import glob
-import yaml
 from setuptools import setup, find_packages
-
-def parse_environment_yml(file_path="env/environment.yml"):
-    """Read dependencies from environment.yml and return a list of pip-compatible packages."""
-    with open(file_path, "r") as file:
-        env_data = yaml.safe_load(file)
-    
-    dependencies = []
-    for dep in env_data.get("dependencies", []):
-        # Handle pip section separately if present
-        if isinstance(dep, dict) and "pip" in dep:
-            dependencies.extend(dep["pip"])
-        elif isinstance(dep, str):
-            # Exclude python version dependency for pip packages
-            if not dep.startswith("python"):
-                dependencies.append(dep)
-    return dependencies
 
 setup(
     name="snowwi_tools",
@@ -35,7 +18,6 @@ setup(
         "Operating System :: OS Independent",
     ],
     python_requires=">=3.10",
-    install_requires=parse_environment_yml(),
     include_package_data=True
 )
 

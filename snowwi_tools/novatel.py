@@ -184,7 +184,10 @@ def get_velocities(ecef, times):
 
     v_mags = np.linalg.norm(v_interp, axis=0)
 
-    return v_interp, v_mags
+    return {
+        'xyz_vels': v_interp,
+        'mag_vels': v_mags
+    }
 
 
 def novatel_to_dict(novatel_file):
@@ -212,3 +215,39 @@ def get_cog(novatel, non_causal=False):
             [cog_i if cog_i < 180 else cog_i - 360 for cog_i in cog]
         )
     return cog
+
+
+def get_attitude_dictionary(novatel_df, fl_info):
+    """
+    Returns the position/attitude of the flightline specified by fl_info,
+    retrieved from the excel database.
+
+    Inputs:
+    ----------
+        - novatel_df: NovAtel data loaded as Pandas dataframe
+        - fl_info: Flightline information retrieved from the excel database, as Pandas dataframe.
+
+    Outputs:
+    ----------
+        - Python dictionary: 
+            {'xyz': ECEF coordinates of flightline,
+             'llh': Lat, Lon, Hei of flightline,
+             'ypr': Yaw, pitch, roll of flightline,
+             'vels': Velocities wrt. ECEF coordinates}
+    """
+    # Get flightline from full file
+    flightline = retrieve_flightline(novatel_df, fl_info)
+    
+    # Get time vector from flightline for velocities
+    time_vect = pd.to_numeric(flightline['GPSSeconds'], errors='coerce')
+
+    return {
+        'xyz': get_ecef(flightline),
+        'ypr': get_ypr(flightline),
+        'llh': get_llh(flightline),
+        'vels': get_velocities(flightline, time_vect),
+        'time': time_vect
+    }
+
+def retrieve_flightline(df, fl_info):
+    return df.loc[(df['GPSSeconds'] >= fl_info['Start']) & (df['GPSSeconds'] <= fl_info['Stop'])]
