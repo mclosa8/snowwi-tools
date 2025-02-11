@@ -24,10 +24,10 @@ from multiprocessing import Pool
 from pprint import PrettyPrinter
 pp = PrettyPrinter()
 
-from snowwi_lite.file_handling import read_and_reshape, list_files_from_dir, combine_results
-from snowwi_lite.params import get_band_params_4x2, get_band_params
-from snowwi_lite.ra.radar_processing import filter_and_compress
-from snowwi_lite.utils import make_chirp_dict
+from snowwi_tools.file_handling import read_and_reshape, list_files_from_dir, combine_results
+from snowwi_tools.params import get_band_params_4x2, get_band_params
+from snowwi_tools.ra.radar_processing import filter_and_compress
+from snowwi_tools.utils import make_chirp_dict
 
 from scipy.constants import speed_of_light
 

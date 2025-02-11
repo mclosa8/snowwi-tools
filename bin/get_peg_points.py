@@ -11,8 +11,8 @@
         - v0.1: Initial version (MCT)
 """
 
-from snowwi.utils import read_spreadsheet, natural_keys
-from snowwi.novatel import read_novatel, get_llh, get_cog
+from snowwi_tools.utils import read_spreadsheet, natural_keys
+from snowwi_tools.novatel import read_novatel, get_llh, get_cog
 import numpy as np
 import pandas as pd
 

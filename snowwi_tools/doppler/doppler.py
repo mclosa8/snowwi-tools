@@ -1,6 +1,6 @@
 import numpy as np
 
-from snowwi_novatel import get_ecef, get_llh, get_velocities, get_ypr
+from snowwi_tools.novatel import get_ecef, get_llh, get_velocities, get_ypr
 
 # Number of seconds between Unix epoch (1 January 1970) and GPS epoch (6 January 1980)
 GPS_UNIX_EPOCH_DIFF = 315964800

@@ -18,7 +18,7 @@ from multiprocessing import Pool
 from scipy.interpolate import CubicSpline
 
 from scipy.signal import correlate
-from snowwi_lite.signal import exp_chirp, butter_bandpass_filter
+from snowwi_tools.signal import exp_chirp, butter_bandpass_filter
 
 def compensate_range_loss(data, range_bins, order=1):
     return data*range_bins**order

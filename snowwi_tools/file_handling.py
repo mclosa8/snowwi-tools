@@ -17,9 +17,9 @@ import h5py
 import os
 import time
 
-from snowwi_lite.ra.radar_processing import compress
-from snowwi_lite.signal import butter_bandpass_filter
-from snowwi_lite.utils import natural_keys
+from snowwi_tools.ra.radar_processing import compress
+from snowwi_tools.signal import butter_bandpass_filter
+from snowwi_tools.utils import natural_keys
 
 
 def download_from_s3(bucket, key, local_path):
