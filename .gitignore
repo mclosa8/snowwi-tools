@@ -7,6 +7,10 @@ __pycache__/
 build/
 snowwi_lite.egg-info/
 
+#.DS_Stores
+.DS_Store
+bin/.DS_Store
+
 # Configuration file
 *.cfg
 

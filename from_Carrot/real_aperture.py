@@ -11,6 +11,11 @@
         - v0: Nov 14, 2024 - MCT
 """
 
+from scipy.constants import speed_of_light
+from utils import make_chirp_dict
+from radar_processing import filter_and_compress
+from params import get_band_params_4x2, get_band_params
+from file_handling import read_and_reshape, list_files_from_dir, combine_results
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -24,18 +29,13 @@ from multiprocessing import Pool
 from pprint import PrettyPrinter
 pp = PrettyPrinter()
 
-from snowwi_lite.file_handling import read_and_reshape, list_files_from_dir, combine_results
-from snowwi_lite.params import get_band_params_4x2, get_band_params
-from snowwi_lite.ra.radar_processing import filter_and_compress
-from snowwi_lite.utils import make_chirp_dict
-
-from scipy.constants import speed_of_light
 
 # Some hardcoded params I don't like...
 
 # Data handling stuff
 N = 64000
-HEADER_LENGTH = 48
+N = 100000
+HEADER_LENGTH = 4
 SKIP_SAMPLES = 2450
 SKIP_SAMPLES = 0
 SWATH_START = 19750
@@ -44,42 +44,64 @@ SWATH_START = 19750
 PRF = 1e3
 PRT = PRF ** -1
 SAMP_FREQ = 983.064e6
+SAMP_FREQ = 1.2288e9
 SAMP_TIME = SAMP_FREQ ** -1
 PULSE_LENGTH = 11e-6
+# PULSE_LENGTH = 20e-6
 
-# Plotting stuff
+# Plotting stuff # Even channels Co-pol, Odd channels X-pol
 CLIMS = {
-    0: [90, 130],
-    2: [60, 90],
-    1: [90, 130],
+    0: [75, 120],
+    1: [60, 90],
+    2: [75, 120],
     3: [60, 90],
 }
+CLIMS = {
+    0: [75, 120],
+    1: [75, 120],
+    2: [75, 120],
+    3: [75, 120],
+}
+CLIMS = {
+    0: [75, 110],
+    1: [60, 110],
+    2: [75, 110],
+    3: [60, 110],
+}
+
 
 def parse_args():
-    
+
     arg_parser = argparse.ArgumentParser(add_help=True)
 
     arg_parser.add_argument('path', help='/path/to/data/to/process')
-    arg_parser.add_argument('flightline', help='Fligtline ID (YYYYMMDDThhmmss)')
-    arg_parser.add_argument('--channel', '-c',help='DAQ system channel',
+    arg_parser.add_argument(
+        'flightline', help='Fligtline ID (YYYYMMDDThhmmss)')
+    arg_parser.add_argument('--channel', '-c', help='DAQ system channel',
                             type=int, nargs='+', required=True)
     arg_parser.add_argument('--band', '-b',
                             help='SNOWWI band: low, high, c, all',
                             default='all',
-                            nargs='+')
+                            nargs='+', required=True)
+    arg_parser.add_argument('--pulse-length', '-pl', help='Chirp length in s',
+                            default=16.5e-6, type=float)
     arg_parser.add_argument('--num-files', '-nf',
                             help='Number of files to process. If number is larger than number of files collected, process all. If not specified, process 100 files.',
                             default=100, type=int)
     arg_parser.add_argument('--process-from', '-pf',
                             help='First file to process. If not specified, start from first file',
-                            default=0)
+                            default=0, type=int)
     arg_parser.add_argument('--samples-per-pulse', '-n0',
                             help='Number of radar samples per pulse.',
-                            type=int, default=100000)
+                            type=int, default=100004)
+    arg_parser.add_argument('--save-fig', '-sf')
+    arg_parser.add_argument(
+        '--no-plot', '-np', action='store_true', default=False)
     arg_parser.add_argument('--ettus', '-ettus', action='store_true',
                             help='If flag used, will range compress data using Ettus frequency plan.',
                             default=False)
-    
+    arg_parser.add_argument('--interferometry', '-itf', action='store_true', default=False)
+
     print("\n\nDEFAULT NUMBER OF SAMPLES PER PULSE SET TO NEW NUMBER OF SAMPLES\n\n")
 
     args = arg_parser.parse_args()
@@ -107,7 +129,7 @@ def parse_args():
 
 
 def main():
-    
+
     args, path_to_flightline = parse_args()
     print(args)
     print()
@@ -115,18 +137,45 @@ def main():
     print(f"Path to chosen flightline: {path_to_flightline}")
     print()
 
-    if args.band == 'all':
+    if 'all' in args.band:
+
         bands_to_process = ['low', 'high', 'c']
     else:
         bands_to_process = args.band
     print(f"Bands to process: {bands_to_process}")
+    time.sleep(2)
 
-    if args.channel == 'all':
+    if 'all' in args.channel:
         channels_to_process = [0, 1, 2, 3]
     else:
         channels_to_process = args.channel
     print(f"Channels to process: {channels_to_process}")
     print()
+
+    if args.interferometry:
+        if 0 in args.channel or 2 in args/{args.flightline}.channel:
+            channels_to_process = [0, 2]
+        elif 1 in args.channel or 3 in args.channel:
+            channels_to_process = [1, 3]
+        print(f'Doing interferometry. Processing channels {channels_to_process}')
+        time.sleep(2)
+
+    if args.save_fig:
+        if not os.path.isdir(f'{args.save_fig}/{args.flightline}'):
+            print(f'{args.save_fig}/{args.flightline} not a directory. Creating it...')
+            os.mkdir(f'{args.save_fig}/{args.flightline}')
+        else:
+            print(f'{args.save_fig}/{args.flightline} already exists.')
+
+    print(f"Pulse length used: {args.pulse_length}")
+
+    if (args.save_fig):
+        print(f"Saving figure to: {args.save_fig}")
+    else:
+        print('Not saving figure.')
+    print()
+
+    print(args.no_plot)
 
     time.sleep(2)
 
@@ -137,13 +186,13 @@ def main():
 
         path_to_channel = os.path.join(path_to_flightline, f'chan{chan}')
         print(f"Path to channel to process: {path_to_channel}")
-        
+
         filelist, ts_from_file = list_files_from_dir(
             path_to_channel,
             args.process_from,
             args.process_from + args.num_files)
         print('\n')
-        
+
         pp.pprint(f"Files to process: {filelist}")
         print('\n')
 
@@ -160,13 +209,13 @@ def main():
         with Pool(processes=os.cpu_count()) as p:
             tmp_results = p.starmap(
                 read_and_reshape,
-                    [(file, N, HEADER_LENGTH,
-                      SKIP_SAMPLES, N)
-                     for file in filelist]
+                [(file, N, HEADER_LENGTH,
+                  SKIP_SAMPLES, N)
+                 for file in filelist]
             )
 
         raw_data, ts_from_file, headers = combine_results(tmp_results)
-        del(tmp_results)
+        del (tmp_results)
         print(raw_data.shape)
 
         for j, band in enumerate(bands_to_process):
@@ -186,7 +235,7 @@ def main():
                 band_params['f0'],
                 band_params['f_l'],
                 band_params['f_h'],
-                PULSE_LENGTH,
+                args.pulse_length,
                 band_params['chirp_type'],
                 SAMP_FREQ
             )
@@ -206,10 +255,17 @@ def main():
             # Reconstruct the RC matrix
             samp_ref = tmp_results[0].shape[1]
             sh_assert_msg = 'Invalid number of samples. Error in reshaping.'
-            assert all([ch.shape[1] == samp_ref for ch in tmp_results]), sh_assert_msg
-            
+            assert all(
+                [ch.shape[1] == samp_ref for ch in tmp_results]), sh_assert_msg
+
             rc = np.vstack([tmp for tmp in tmp_results])
             print(rc.shape)
+
+            if args.interferometry and chan == channels_to_process[0]:
+                ref = rc + 0
+                print('Reference image stored.')
+            else:
+                print('No reference image stored.')
 
             # This could be condensed into a single function but as of now
             # it'll stay like this...
@@ -230,23 +286,41 @@ def main():
             im_ratio = rc.shape[0]/rc.shape[1]
             print(im_ratio)
 
-            plt.figure()
+            plt.figure(figsize=(16, 9))
             plt.imshow(20*np.log10(abs(rc)), cmap='gray', origin='upper',
                        vmin=CLIMS[chan][0], vmax=CLIMS[chan][1],
                        extent=[sr[0], sr[1], flight_time[-1], flight_time[0]],
-                       aspect=.5e3)
-            plt.title(f"RC image - Band: {band} - Channel: {chan} - ({args.process_from}, {args.process_from + args.num_files})")
-            plt.colorbar()
+                       aspect=.125e3)
+            plt.title(
+                f"RC image - Band: {band} - Channel: {chan} - ({args.process_from}, {args.process_from + args.num_files})")
+            plt.colorbar(label='(dB) - Uncal.')
             plt.xlabel('Slant range (m)')
             plt.ylabel('Flight time (s)')
-            plt.draw()
-            plt.pause(0.001)
+            # plt.draw()
+            # plt.pause(0.001)
+            if (args.save_fig):
+                plt.savefig(
+                    f"{args.save_fig}/{args.flightline}/{args.flightline}_{band}_{chan}_{args.process_from}_{args.num_files}_.png", dpi=500)
+            if (args.no_plot):
+                print("Clearing fig...")
+                plt.close()
+            plt.close()
             time.sleep(1)
 
-    plt.show()
+    # plt.show()
 
+    if args.interferometry:
+        interferogram = ref * np.conjugate(rc)
 
-
+        plt.figure()
+        plt.imshow(np.angle(interferogram), cmap='jet',
+            extent=[sr[0], sr[1], flight_time[-1], flight_time[0]],
+            aspect=.125e3)
+        plt.xlabel('Slant range (m)')
+        plt.ylabel('Flight time (s)')
+        if (args.save_fig):
+                plt.savefig(
+                    f"{args.save_fig}/{args.flightline}/{args.flightline}_{band}_{channels_to_process}_{args.process_from}_{args.num_files}_interf.png", dpi=500)
 
 
 if __name__ == "__main__":

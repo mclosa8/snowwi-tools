@@ -11,8 +11,8 @@
         - v0.1: Initial version (MCT)
 """
 
-from snowwi_lite.utils import read_spreadsheet, natural_keys
-from snowwi_lite.novatel import read_novatel, get_llh, get_cog
+from snowwi.utils import read_spreadsheet, natural_keys
+from snowwi.novatel import read_novatel, get_llh, get_cog
 import numpy as np
 import pandas as pd
 
@@ -155,9 +155,11 @@ def main():
 
     # Finally, we write the dict to file
     with open(f'pegs_{args.campaign.lower()}.txt', 'w') as f:
-        f.write(f'Flightline_ID    PEG_LAT(deg)    PEG_LON(deg)    PEG_H-ELL(m)    PEG-Heading(deg)\n')
+        f.write(
+            f'Flightline_ID    PEG_LAT(deg)    PEG_LON(deg)    PEG_H-ELL(m)    PEG-Heading(deg)\n')
         for key, value in flightline_dict.items():
-            f.write(f'{key}    {value[0]}    {value[1]}    {value[2]}    {value[3]}\n')
+            f.write(
+                f'{key}    {value[0]}    {value[1]}    {value[2]}    {value[3]}\n')
 
 
 if __name__ == "__main__":
