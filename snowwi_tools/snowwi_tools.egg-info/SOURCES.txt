@@ -1,0 +1,10 @@
+README.md
+setup.py
+bin/generate_antenna_pattern.py
+bin/get_peg_points.py
+bin/real_aperture.py
+snowwi/snowwi_tools.egg-info/PKG-INFO
+snowwi/snowwi_tools.egg-info/SOURCES.txt
+snowwi/snowwi_tools.egg-info/dependency_links.txt
+snowwi/snowwi_tools.egg-info/requires.txt
+snowwi/snowwi_tools.egg-info/top_level.txt

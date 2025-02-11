@@ -1,4 +1,6 @@
+import glob
 import yaml
+
 from setuptools import setup, find_packages
 
 def parse_environment_yml(file_path="env/environment.yml"):
@@ -20,19 +22,15 @@ def parse_environment_yml(file_path="env/environment.yml"):
 setup(
     name="snowwi-tools",
     version="0.1.0",
-    author="Your Name",
+    author="Marc Closa Tarres (MCT)",
     author_email="your.email@example.com",
-    description="A collection of tools for antenna pattern generation, peg point extraction, and radar processing.",
+    description="A collection of tools for SNOWWI processing and data handling.",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/snowwi-tools",  # Replace with the actual repo URL if available
-    packages=find_packages(where="snowwi"),
-    package_dir={"": "snowwi"},
-    scripts=[
-        "bin/generate_antenna_pattern.py",
-        "bin/get_peg_points.py",
-        "bin/real_aperture.py",
-    ],
+    url="https://github.com/mclosa8/snowwi-tools",  # Replace with the actual repo URL if available
+    packages=find_packages(where="snowwi_tools"),
+    package_dir={"": "."},
+    scripts=glob.glob('bin/*.py'),
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
