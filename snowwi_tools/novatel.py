@@ -4,6 +4,7 @@ import pandas as pd
 
 from scipy.interpolate import CubicSpline
 
+SECONDS_PER_WEEK = 604_800
 
 def read_novatel(file_path, skiprows=18, column_names=None):
     """
@@ -148,9 +149,9 @@ def get_ypr(novatel, start_idx=0, end_idx=-1):
     )
 
     ypr_means = (
-        np.mean(yaw),
-        np.mean(pitch),
-        np.mean(roll),
+        np.mean(yaw)*np.ones_like(yaw),
+        np.mean(pitch)*np.ones_like(pitch),
+        np.mean(roll)*np.ones_like(roll),
     )
 
     return np.vstack((yaw, pitch, roll)), ypr_means
@@ -184,10 +185,7 @@ def get_velocities(ecef, times):
 
     v_mags = np.linalg.norm(v_interp, axis=0)
 
-    return {
-        'xyz_vels': v_interp,
-        'mag_vels': v_mags
-    }
+    return v_interp, v_mags
 
 
 def novatel_to_dict(novatel_file):
@@ -238,16 +236,81 @@ def get_attitude_dictionary(novatel_df, fl_info):
     # Get flightline from full file
     flightline = retrieve_flightline(novatel_df, fl_info)
     
-    # Get time vector from flightline for velocities
-    time_vect = pd.to_numeric(flightline['GPSSeconds'], errors='coerce')
+    # Get time vector from flightline for velocities from GPS epoch
+    time_vect = np.array(flightline['GPSSeconds'], dtype=float)
+    time_vect += SECONDS_PER_WEEK * np.array(flightline['Week'])
+
+    ecef = get_ecef(flightline)
+    v_ecef, v_mags = get_velocities(ecef, time_vect)
 
     return {
-        'xyz': get_ecef(flightline),
+        'xyz': ecef,
         'ypr': get_ypr(flightline),
         'llh': get_llh(flightline),
-        'vels': get_velocities(flightline, time_vect),
+        'ecef_vels': v_ecef,
+        'mag_vels': v_mags,
         'time': time_vect
     }
 
 def retrieve_flightline(df, fl_info):
     return df.loc[(df['GPSSeconds'] >= fl_info['Start']) & (df['GPSSeconds'] <= fl_info['Stop'])]
+
+
+def read_excel_database_and_get_date(flightline_xl, date):
+    # Read excel and retrieve flightline information
+# Use pandas to read Excel
+    maxcol = 15
+    cols = np.arange(maxcol)
+    with pd.ExcelFile(flightline_xl) as xls:
+        df1 = pd.read_excel(xls, "February", skiprows=1, usecols=cols)
+    print(df1.keys())
+
+    # Get the columns from date
+    flightlines = df1.loc[(df1['Date (local)'] == date)]
+    flightlines = flightlines.reset_index()
+    return flightlines
+
+
+def ecef_2_tcn(ecef, time):
+    
+    # Reference time to 0
+    time = time - time[0]
+
+    ref = np.mean(ecef, axis=1)
+    print(ref.shape)
+
+    ecef_rel = ecef.T - ref
+    print(ecef_rel.shape)
+
+    ideal_x = np.polyval(
+        np.polyfit(time, ecef[0], 1), time
+    )
+    ideal_y = np.polyval(
+        np.polyfit(time, ecef[1], 1), time
+    )
+    ideal_z = np.polyval(
+        np.polyfit(time, ecef[2], 1), time
+    )
+
+    ideal_ecef = np.vstack((
+        ideal_x,
+        ideal_y,
+        ideal_z
+    ))
+
+    print(ideal_ecef.shape) # 3xN
+    print(ideal_ecef[:, 0], ideal_ecef[:, -1])
+
+    diff = ideal_ecef[:, -1] - ideal_ecef[:, 0]
+
+    t_unit = diff/np.linalg.norm(diff)
+    n_unit = ref / np.linalg.norm(ref)
+    c_unit = np.cross(n_unit, t_unit)
+
+    tcn = np.vstack((
+        np.dot(ecef_rel, t_unit),
+        np.dot(ecef_rel, c_unit),
+        np.dot(ecef_rel, n_unit),
+    ))
+
+    return tcn
