@@ -143,7 +143,6 @@ def main():
         fls_to_process = args.flightline
 
     for flightline in fls_to_process:
-        
 
         print(f"\nFlightline to process: {flightline}.")
 
@@ -151,7 +150,7 @@ def main():
             idx = flightlines.index[(flightlines['FlightLog ID'] == flightline)][0]
             print(f"Converting {args.flightline} into index {idx}")
         else:
-            idx = int(args.flightline)
+            idx = int(flightline)
 
         fl_info = flightlines.loc[idx]
         print(fl_info)
@@ -160,7 +159,8 @@ def main():
         print(fl_info)
         
         subdir_name = fl_info['Complete ID'].replace("-", f"/{idx}_")
-        fl_image_path = os.path.join(f'imgs/{subdir_name}')
+        fl_image_path = os.path.join(f'{args.save_to}/{subdir_name}')
+        print(f"Saving to: {fl_image_path}")
         if not os.path.exists(fl_image_path):
             print(f'{fl_image_path} does not exist. Creating it...')
             os.makedirs(fl_image_path, exist_ok=True)
