@@ -24,8 +24,8 @@ from multiprocessing import Pool
 from pprint import PrettyPrinter
 pp = PrettyPrinter()
 
-from snowwi_tools.file_handling import read_and_reshape, list_files_from_dir, combine_results
-from snowwi_tools.params import get_band_params_4x2, get_band_params
+from snowwi_tools.lib.file_handling import read_and_reshape, list_files_from_dir, combine_results
+from snowwi_tools.lib.params import get_band_params_4x2, get_band_params
 from snowwi_tools.ra.radar_processing import filter_and_compress
 from snowwi_tools.utils import make_chirp_dict
 
