@@ -374,3 +374,11 @@ def is_empty_file(file):
         return False
     else:
         return True
+
+
+def make_if_not_a_dir(path):
+    if not os.path.exists(path):
+        print(f"Making {path}")
+        os.makedirs(path)
+    else:
+        print(f"{path} already exists.")
