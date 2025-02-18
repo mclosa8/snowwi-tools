@@ -18,8 +18,8 @@ import os
 import time
 
 from snowwi_tools.ra.radar_processing import compress
-from snowwi_tools.signal import butter_bandpass_filter
-from snowwi_tools.utils import natural_keys
+from snowwi_tools.lib.signal_processing import butter_bandpass_filter
+from utils import natural_keys
 
 
 def download_from_s3(bucket, key, local_path):
@@ -83,6 +83,7 @@ def read_and_compress_aws(bucket, key, local_path,
         'timestamp': timestamp
     }
 
+
 def read_and_compress_local(data_path,
                             N, header_samples, skip_samples, last_samp,
                             chirp, window, filter=None
@@ -95,9 +96,9 @@ def read_and_compress_local(data_path,
     print(f"Reading {data_path} from Synology disk...")
 
     dict = read_and_reshape(data_path, N,
-                                              header_samples=header_samples,
-                                              skip_samples=skip_samples,
-                                              truncate=last_samp)
+                            header_samples=header_samples,
+                            skip_samples=skip_samples,
+                            truncate=last_samp)
     reshaped_data = dict['data']
     headers = dict['headers']
     if filter is not None:
@@ -202,6 +203,7 @@ def h5_opener(filename, label, thresh=0):  # regular version
     with h5py.File(filename, 'r') as hf:
         data = hf[label][:, thresh:]
     return data
+
 
 def list_files_from_bucket(bucket, prefix, flightline, channel):
     import pprint
@@ -309,14 +311,21 @@ def get_flightline_params_from_rc(filename):
 def read_and_reshape(filename, N, header_samples=0, skip_samples=0, truncate=None):
     print(f"Reading file:")
     print(f"    {filename}")
-    
+
+    print(N, header_samples, skip_samples)
+    print(N + header_samples)
+    n = N + header_samples
+
     data = np.fromfile(filename, dtype=np.int16)
-    data = data.reshape(-1, N)[:, :truncate]
-    
+    data = data.reshape(-1, N + header_samples)[:, :truncate + header_samples]
+    print(data.shape)
+
     headers = data[:, :header_samples].astype(np.uint16)
-    
-    data = np.delete(data, np.s_[:skip_samples], axis=1)
-    
+    print(headers.shape)
+
+    data = np.delete(data, np.s_[:skip_samples + header_samples], axis=1)
+    print(data.shape)
+
     timestamp = float(filename.split('_')[-1][:-4])
     timestamps = np.ones(data.shape[0]) * timestamp
 
@@ -359,3 +368,9 @@ def combine_results(rets):
     print(data.dtype)
 
     return data, timestamps, headers
+
+def is_empty_file(file):
+    if os.path.getsize() > 0:
+        return False
+    else:
+        return True
