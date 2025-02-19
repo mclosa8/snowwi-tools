@@ -19,7 +19,7 @@ import time
 
 from snowwi_tools.ra.radar_processing import compress
 from snowwi_tools.lib.signal_processing import butter_bandpass_filter
-from utils import natural_keys
+from snowwi_tools.utils import natural_keys
 
 
 def download_from_s3(bucket, key, local_path):
