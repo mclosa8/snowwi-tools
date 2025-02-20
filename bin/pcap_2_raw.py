@@ -63,6 +63,7 @@ def parse_args():
                             help="Total time of radar data to process. Will be converted into number of PCAP files. If 'all', process all the files with data. Default: all.")
 
     args = arg_parser.parse_args()
+    args.base_directory = os.path.normpath(args.base_directory)
     
     return args
 
@@ -84,12 +85,12 @@ def get_arduino_time(directory):
     arduino_file = os.path.join(directory, "arduino_data.log")
     arduino_df = pd.read_csv(arduino_file, sep='\s+', header=None)
     first_row = arduino_df.loc[arduino_df[3] == 1].iloc[0]
-    fr_date = first_row[9].split('/') # Of the format [DD, MM, YYYY]
+    fr_date = first_row[9].split('/') # Of the format [MM, DD, YYYY]
     fr_time = first_row[10].split(':') # Of the format [hh, mm, ss]
-    print(fr_date)
-    print(fr_time)
+    print(f"Date from Arduino log: {fr_date}")
+    print(f"Time from Arduino log: {fr_time}")
     gps_datetime = datetime.datetime(
-        int(fr_date[2]), int(fr_date[1]), int(fr_date[0]),
+        int(fr_date[2]), int(fr_date[0]), int(fr_date[1]), # We want this to be YYYY MM DD
         int(fr_time[0]), int(fr_time[1]), int(fr_time[2]))
     print(gps_datetime)
     arduino_gps_s = datetime_to_gps_timestamp(gps_datetime)
@@ -135,16 +136,29 @@ def main():
     
     print(args)
 
+    base_name = os.path.basename(args.base_directory)
+    print(base_name)
+
+    filelist = glob.glob(os.path.join(args.base_directory, "*.pcap*"))
+    if len(filelist) == 0:
+        args.base_directory = os.path.join(args.base_directory, base_name)
+        print(args.base_directory)
+        filelist = glob.glob(os.path.join(args.base_directory, "*.pcap*"))
+    filelist.sort(key=natural_keys)
+    print(len(filelist))
+
     # If arduino time definition - if arduino not used, uses time from directory name
     if args.use_arduino_time:
         time, arduino_unix_ms = get_arduino_time(args.base_directory)
     else:
-        time_from_dir = os.path.basename(os.path.normpath(args.base_directory)).split("_")[-1]
+        time_from_dir = base_name.split("_")[-1]
         time = datetime.datetime.utcfromtimestamp(time_from_dir)
 
     print(time)
     dir_name = f"{time.year}{time.month:02}{time.day:02}T{time.hour:02}{time.minute:02}{time.second:02}"
+    day_dir = dir_name.split('T')[0]
     print(dir_name)
+    print(day_dir)
     
     # Define output directories
     if not args.save_to:    
@@ -152,7 +166,7 @@ def main():
     else:
         save_directory = args.save_to
 
-    save_directory = os.path.join(save_directory, dir_name)
+    save_directory = os.path.join(save_directory, day_dir, dir_name)
     
     if not args.use_arduino_time:
         save_directory += 'no_gps_time'
@@ -170,8 +184,6 @@ def main():
     make_if_not_a_dir(ch2)
     make_if_not_a_dir(ch3)
         
-    filelist = glob.glob(os.path.join(args.base_directory, "*.pcap*"))
-    filelist.sort(key=natural_keys)
 
     if args.sec_of_data.isdigit():
         num_files = time_2_num_pcap(args.sec_of_data)

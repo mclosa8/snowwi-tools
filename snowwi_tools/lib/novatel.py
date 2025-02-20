@@ -252,6 +252,7 @@ def get_attitude_dictionary(novatel_df, fl_info):
         'time': time_vect
     }
 
+
 def retrieve_flightline(df, fl_info):
     return df.loc[(df['GPSSeconds'] >= fl_info['Start']) & (df['GPSSeconds'] <= fl_info['Stop'])]
 
