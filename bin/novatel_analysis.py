@@ -26,19 +26,16 @@ from argparse import ArgumentParser
 from pprint import PrettyPrinter
 
 from snowwi_tools import file_handling
-from snowwi_tools.novatel import read_novatel
-from snowwi_tools.novatel import get_attitude_dictionary
+from snowwi_tools.lib.novatel import read_novatel
+from snowwi_tools.lib.novatel import get_attitude_dictionary
 from snowwi_tools.lib.novatel import read_excel_database_and_get_date
-from snowwi_tools.novatel import ecef_2_tcn
+from snowwi_tools.lib.novatel import ecef_2_tcn
 
 from snowwi_tools.utils import natural_keys
+from snowwi_tools.utils import set_rcParams
 
-# Set the RC params
-plt.rcParams['figure.dpi'] = 200
-plt.rcParams['font.size'] = 8
-plt.rcParams['font.family'] = 'serif'
-plt.rcParams['lines.linewidth'] = .7
-#  plt.rcParams['text.usetex'] = True
+# Set rcParams
+set_rcParams(plt, tex=True)
 
 def parse_args():
     

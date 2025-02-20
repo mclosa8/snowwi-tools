@@ -33,3 +33,12 @@ def read_spreadsheet(flightline_xl, sheet_name, maxcols=11):
         df = pd.read_excel(xls, sheet_name, skiprows=1, usecols=np.arange(maxcols))
     print(df.keys())
     return df
+
+def set_rcParams(plt, tex=False):
+    # Set the RC params
+    plt.rcParams['figure.dpi'] = 200
+    plt.rcParams['font.size'] = 9
+    plt.rcParams['font.family'] = 'serif'
+    plt.rcParams['lines.linewidth'] = .7
+    if tex:
+        plt.rcParams['text.usetex'] = True

@@ -256,7 +256,7 @@ def retrieve_flightline(df, fl_info):
     return df.loc[(df['GPSSeconds'] >= fl_info['Start']) & (df['GPSSeconds'] <= fl_info['Stop'])]
 
 
-def read_excel_database_and_get_date(flightline_xl, campaign, date):
+def read_excel_database(flightline_xl, campaign):
     # Read excel and retrieve flightline information
     # Use pandas to read Excel
     maxcol = 15
@@ -264,15 +264,19 @@ def read_excel_database_and_get_date(flightline_xl, campaign, date):
     with pd.ExcelFile(flightline_xl) as xls:
         df1 = pd.read_excel(xls, campaign, skiprows=1, usecols=cols)
     print(df1.keys())
+    return df1
 
-    print()
 
+def retrieve_date_from_excel_database(dataframe, date):
     # Get the columns from date
-    flightlines = df1.loc[(df1['Date (local)'] == date)]
+    flightlines = dataframe.loc[(dataframe['Date (local)'] == date)]
     flightlines = flightlines.reset_index()
     print(flightlines.shape)
-    
     return flightlines
+
+def read_excel_database_and_get_date(flightline_xl, campaign, date):
+    df1 = read_excel_database(flightline_xl, campaign)
+    return retrieve_date_from_excel_database(df1, date)
 
 
 def ecef_2_tcn(ecef, time):

@@ -56,7 +56,7 @@ def get_band_params(band, channel):
     return params
 
 
-def get_band_params_4x2(band, channel):
+def get_band_params_4x2(band):
     band_params = {
         'low': {
             'f0': 13.64e9,
@@ -75,19 +75,23 @@ def get_band_params_4x2(band, channel):
             'highcut': 305e6,
         },
         'c': {
-            'f0': 17.24e9,
+            'f0': 5.39e9,
             'f_l': 340e6,
             'f_h': 420e6,
             'chirp_type': 'up', # I actually don't know for sure. Up makes sense
             'lowcut': 315e6,
             'highcut': 425e6,
-        }
+        },
+        'prf': 1e3
     }
 
     if band not in band_params:
         raise Exception("No valid band selected")
 
-    params = band_params[band].copy()
+    if band == 'prf':
+        params = band_params[band]
+    else:  
+        params = band_params[band].copy()
     # params['channel'] = eval(params['channels'][channel])
     # del params['channels']
 
