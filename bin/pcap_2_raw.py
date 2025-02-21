@@ -34,7 +34,7 @@ packets_per_burst = 250
 packets_per_new_file = 250 * 500 #Half a second of data
 samples_per_packet = 8*50
 header_per_packet = 96
-num_files = 1580 # TODO - change this to argument - talk to Joe
+num_files = 1580 # TODO - change this to argument - talk to Joe - Don't really need this anymore
 packetsTotal = 0
 
 base_directory = "/home/olaf/mission_control/in_flight_storage/destination_drive_0/stream_1733449335/raw_data.pcap"  # TODO - Also change this to script argument

@@ -156,7 +156,7 @@ def main():
         print(fl_info)
         
         subdir_name = fl_info['Complete ID'].replace("-", f"/{idx}_")
-        fl_image_path = os.path.join(f'{args.save_to}/{subdir_name}')
+        fl_image_path = os.path.join(f'{args.save_to}', 'imgs', f'{subdir_name}')
         print(f"Saving to: {fl_image_path}")
         if not os.path.exists(fl_image_path):
             print(f'{fl_image_path} does not exist. Creating it...')
@@ -166,6 +166,10 @@ def main():
 
 
         fl_df = get_attitude_dictionary(nv_df, fl_info)
+        if fl_df is None:
+            print("Skipping...")
+            continue
+        
 
         # Full flight vs flightline
         plt.figure()

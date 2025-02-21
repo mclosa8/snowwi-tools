@@ -235,6 +235,9 @@ def get_attitude_dictionary(novatel_df, fl_info):
     """
     # Get flightline from full file
     flightline = retrieve_flightline(novatel_df, fl_info)
+    if flightline.shape[0] == 0:
+        print("No flightline found.")
+        return None
     
     # Get time vector from flightline for velocities from GPS epoch
     time_vect = np.array(flightline['GPSSeconds'], dtype=float)
