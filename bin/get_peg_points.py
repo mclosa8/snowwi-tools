@@ -31,7 +31,7 @@ def parse_args():
     arg_parser.add_argument('spreadsheet_file', type=str,
                             help="Spreadsheet file with flightlines.")
     arg_parser.add_argument(
-        'campaign', type=str, help="Campaign month. 2024: January, March. 2025: TBD.")
+        'campaign', type=str, help="Campaign month. 2024: January, March. 2025: January, February.")
     arg_parser.add_argument('--output', '-o', type=str, default='snowwi_peg.txt',
                             help="Output txt file with PEG points.")
 
@@ -69,9 +69,10 @@ def main():
     for novatel_file in novatel_files:
         print(f'\n\nProcessing {novatel_file}...')
 
-        date = int(novatel_file.split('/')[-1].split('_')[1].split('.')[0])
+        date_candidates = novatel_file.split('/')[-1].split('.')[0].split('_')
+        date = [date for date in date_candidates if date.isdigit()] # We do this because the naming of NovAtel files is inconsistent.
+        date = int(date[0])
         all_dates[date] = []
-        print(date)
         if (date == 20240328):
             band = novatel_file.split(
                 '/')[-1].split('_')[2].split('.')[0].upper()
@@ -83,7 +84,7 @@ def main():
         fl_date = flightline_dict.copy()
 
         fl_info = excel_df.loc[(
-            excel_df['Date'] == date)].reset_index(drop=True)
+            excel_df['Date (local)'] == date)].reset_index(drop=True)
         print(fl_info)
         if band:
             mask = [(band in tmp) and (tmp != 'APPROACH')
@@ -125,7 +126,8 @@ def main():
             peg = np.mean(llh, axis=1)
             print(peg.shape)
             print(f'PEG point (llhh): {peg}')
-            if not np.nan in peg:
+            print(not any(np.isnan(peg)))
+            if not any(np.isnan(peg)):
                 print('Appending...')
                 fl_date[fl_id].append(peg)
             # print(fl_date)
@@ -153,11 +155,15 @@ def main():
 
     pp.pprint(flightline_dict)
 
+    sorted_keys = list(flightline_dict.keys())
+    sorted_keys.sort(key=natural_keys)
+
     # Finally, we write the dict to file
     with open(f'pegs_{args.campaign.lower()}.txt', 'w') as f:
         f.write(
             f'Flightline_ID    PEG_LAT(deg)    PEG_LON(deg)    PEG_H-ELL(m)    PEG-Heading(deg)\n')
-        for key, value in flightline_dict.items():
+        for key in sorted_keys:
+            value = flightline_dict[key]
             f.write(
                 f'{key}    {value[0]}    {value[1]}    {value[2]}    {value[3]}\n')
 
