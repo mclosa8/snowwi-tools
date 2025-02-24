@@ -5,10 +5,11 @@
 
     Author: Marc Closa Tarres
     Date: 2024-11-19
-    Version: 0.1
+    Version: 0.2
 
     Changelog:
         - v0.1: Initial version (MCT)
+        - v0.2: Fixed bug with NovAtel file naming inconsistencies - Feb 24, 2025 - MCT
 """
 
 from snowwi_tools.utils import read_spreadsheet, natural_keys
@@ -70,7 +71,8 @@ def main():
         print(f'\n\nProcessing {novatel_file}...')
 
         date_candidates = novatel_file.split('/')[-1].split('.')[0].split('_')
-        date = [date for date in date_candidates if date.isdigit()] # We do this because the naming of NovAtel files is inconsistent.
+        # We do this because the naming of NovAtel files is inconsistent.
+        date = [date for date in date_candidates if date.isdigit()]
         date = int(date[0])
         all_dates[date] = []
         if (date == 20240328):
@@ -105,7 +107,13 @@ def main():
 
         for idx, row in fl_info.iterrows():
             fl_id = row['FlightLog ID']
-
+            print(fl_id)
+            # Gets rid of the last _1 if existent.
+            clean_flid = fl_id.rsplit('_', 1)
+            # We don't refly the same line for more than 10 times.
+            if (clean_flid[0][-1].isdigit()) and (len(clean_flid[1]) == 1):
+                fl_id = clean_flid[0]
+                print(f"Cleaned FlID: {clean_flid}")
             print(f'\nProcessing flightline {fl_id}...')
 
             flightline = novatel_df.loc[(novatel_df['GPSSeconds'] >= row['Start']) & (
@@ -154,8 +162,14 @@ def main():
         flightline_dict[fl_id] = np.mean(flightline_dict[fl_id], axis=0)
 
     pp.pprint(flightline_dict)
+    cleaned_dict = {
+        key: value
+        for key, value in flightline_dict.items()
+        if not (np.isscalar(value) and np.isnan(value))
+    }
+    pp.pprint(cleaned_dict)
 
-    sorted_keys = list(flightline_dict.keys())
+    sorted_keys = list(cleaned_dict.keys())
     sorted_keys.sort(key=natural_keys)
 
     # Finally, we write the dict to file
@@ -163,7 +177,7 @@ def main():
         f.write(
             f'Flightline_ID    PEG_LAT(deg)    PEG_LON(deg)    PEG_H-ELL(m)    PEG-Heading(deg)\n')
         for key in sorted_keys:
-            value = flightline_dict[key]
+            value = cleaned_dict[key]
             f.write(
                 f'{key}    {value[0]}    {value[1]}    {value[2]}    {value[3]}\n')
 
