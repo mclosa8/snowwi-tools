@@ -325,10 +325,10 @@ def read_and_reshape(filename, N, header_samples=0, skip_samples=0, truncate=Non
     print(data.shape)
 
     headers = data[:, :header_samples].astype(np.uint16)
-    print(headers.shape)
+    print(f"Headers: {headers.shape}")
 
     data = np.delete(data, np.s_[:skip_samples + header_samples], axis=1)
-    print(data.shape)
+    print(f"Data after: {data.shape}")
 
     timestamp = float(filename.split('_')[-1][:-4])
     timestamps = np.ones(data.shape[0]) * timestamp
@@ -372,6 +372,7 @@ def combine_results(rets):
     print(data.dtype)
 
     return data, timestamps, headers
+
 
 def is_empty_file(file):
     if os.path.getsize() > 0:
