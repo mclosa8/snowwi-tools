@@ -14,6 +14,7 @@
 import glob
 import os
 import subprocess
+import sys
 
 from argparse import ArgumentParser
 
@@ -24,8 +25,9 @@ from time import sleep
 from pprint import PrettyPrinter
 pp = PrettyPrinter()
 
+
 def parse_args():
-    
+
     arg_parser = ArgumentParser()
 
     arg_parser.add_argument('base_directory',
@@ -39,6 +41,10 @@ def parse_args():
     arg_parser.add_argument('--sec-of-data', '-sd',
                             default='all',
                             help="Total time of radar data to process. Will be converted into number of PCAP files. If 'all', process all the files with data. Default: all.")
+    arg_parser.add_argument('--exclude-dst-drive', '-edd',
+                            help='Excludes destination_drive with corresponding number.',
+                            type=int,
+                            default=None)
 
     args = arg_parser.parse_args()
     args.base_directory = os.path.normpath(args.base_directory)
@@ -47,12 +53,13 @@ def parse_args():
 
 
 def main():
-    
+
     args = parse_args()
     print(args)
-
+    tmp_path = os.path.join(args.base_directory, '**/*.pcap*')
+    print(tmp_path)
     all_pcaps = glob.glob(
-        os.path.join(args.base_directory, '**/*.pcap*'),
+        tmp_path,
         recursive=True
     )
     all_pcaps.sort(key=natural_keys)
@@ -62,7 +69,8 @@ def main():
         os.path.dirname(item) for item in all_pcaps if ('destination' in item) and ('stream' in item)
     ]
     pcap_paths = set(pcap_paths)
-    print(len(pcap_paths))
+    print(f"Directories with .pcap files: {len(pcap_paths)}")
+
     all_arduinos = glob.glob(
         os.path.join(args.base_directory, '**/ard*.log*'),
         recursive=True
@@ -71,10 +79,23 @@ def main():
         os.path.dirname(item) for item in all_arduinos if ('destination' in item) and ('stream' in item)
     ]
     ards_paths = set(ards_paths)
-    print(len(ards_paths))
+    print(f"Directories with arduino files: {len(ards_paths)}")
 
     final_paths = list(pcap_paths.intersection(ards_paths))
-    print(len(final_paths))
+    final_paths.sort(key=natural_keys)
+    print(f"Directories with arduino AND .pcap files: {len(final_paths)}")
+    print(final_paths[0])
+    print(final_paths[-1])
+
+    if args.exclude_dst_drive != None:
+        dd_excl = f"destination_drive_{args.exclude_dst_drive}"
+        print(f"Excluding {dd_excl}...")
+        final_paths = [
+            item for item in final_paths if dd_excl not in item
+        ]
+        print(f"Directories to parse after excluding: {len(final_paths)}")
+        print(final_paths[0])
+        print(final_paths[-1])
 
     for path in final_paths:
         cmd = [
@@ -85,14 +106,15 @@ def main():
         ]
         if args.use_arduino_time:
             cmd.append('-at')
-        
+
         print(f"Command to use:")
         print(f"    {cmd}")
 
         process = subprocess.Popen(cmd)
         process.wait()
-        print(f"\n\nSuccess. - {process}\n\n\n\n\n")
+        print(f"\n\nDid I wait?\n\n\n\n\n")
         sleep(3)
+
 
 if __name__ == "__main__":
     try:

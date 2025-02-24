@@ -317,7 +317,11 @@ def read_and_reshape(filename, N, header_samples=0, skip_samples=0, truncate=Non
     n = N + header_samples
 
     data = np.fromfile(filename, dtype=np.int16)
-    data = data.reshape(-1, N + header_samples)[:, :truncate + header_samples]
+    if truncate is None:
+        truncate_idx = -1
+    else:
+        truncate_idx = truncate + header_samples
+    data = data.reshape(-1, N + header_samples)[:, :truncate_idx]
     print(data.shape)
 
     headers = data[:, :header_samples].astype(np.uint16)
