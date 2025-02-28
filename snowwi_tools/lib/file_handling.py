@@ -318,7 +318,7 @@ def read_and_reshape(filename, N, header_samples=0, skip_samples=0, truncate=Non
 
     data = np.fromfile(filename, dtype=np.int16)
     if truncate is None:
-        truncate_idx = -1
+        truncate_idx = None
     else:
         truncate_idx = truncate + header_samples
     data = data.reshape(-1, N + header_samples)[:, :truncate_idx]

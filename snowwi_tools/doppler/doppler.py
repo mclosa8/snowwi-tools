@@ -2,6 +2,8 @@ import numpy as np
 
 from snowwi_tools.novatel import get_ecef, get_llh, get_velocities, get_ypr
 
+from snowwi_tools.utils import average_n_rows
+
 from scipy.constants import speed_of_light
 
 # Number of seconds between Unix epoch (1 January 1970) and GPS epoch (6 January 1980)
@@ -9,6 +11,7 @@ GPS_UNIX_EPOCH_DIFF = 315964800
 
 # Number of seconds in a week
 SECONDS_IN_WEEK = 604800
+
 
 def calculate_doppler_from_fl(attitude_dict, look, f0):
     # Technically, Doppler centroid is calculated using elevation angle
@@ -25,9 +28,9 @@ def calculate_doppler_from_fl(attitude_dict, look, f0):
 
     s_psi = np.sin(psi)
     c_psi = np.cos(psi)
-    
+
     s_delta = np.sin(delta)
-    
+
     s_gamma = np.sin(gamma)
     c_gamma = np.cos(gamma)
 
@@ -36,11 +39,11 @@ def calculate_doppler_from_fl(attitude_dict, look, f0):
     f_dopp = 2 * s_theta * v_mags / wvl
 
     return f_dopp
-    
+
 
 def generate_doppler_model(yaw, pitch, roll, vel, wvl, prf, y_offset=0, p_offset=0):
     psi = np.deg2rad(yaw + y_offset)
-    delta  = np.deg2rad(pitch + p_offset)
+    delta = np.deg2rad(pitch + p_offset)
     gamma = np.deg2rad(roll)
 
     azm_nyq = prf/2
@@ -57,12 +60,16 @@ def generate_doppler_model(yaw, pitch, roll, vel, wvl, prf, y_offset=0, p_offset
 
     s_theta = term1 + term2
     f_dopp = (2*s_theta.T*vel/wvl).T
-    aliased = np.mod(f_dopp + azm_nyq, prf) - azm_nyq # Not sure if this is doing the right thing...
-    
-    return aliased
+    # Not sure if this is doing the right thing...
+    aliased = np.mod(f_dopp + azm_nyq, prf) - azm_nyq
+    print(f_dopp.max())
+    print(aliased.max())
+
+    return f_dopp, aliased
+
 
 def get_attitude_for_doppler(novatel_df):
-    
+
     time_array = np.array(
         novatel_df['Week'] + novatel_df['GPSSeconds'], dtype=float
     )
@@ -73,3 +80,19 @@ def get_attitude_for_doppler(novatel_df):
 
     return ypr, ypr_means, v, v_mags
 
+
+def pulse_pair_doppler(data, prf, av_factor=0):
+    if av_factor < 1:
+        av_factor = 1/av_factor
+        print(f"Using the inverse of the average factor: {av_factor}")
+
+    # Pulse-Pair Doppler
+    pp_phase = np.conjugate(data[:-1:]) * data[1::]
+
+    # Accum pulses
+    return -np.angle(average_n_rows(pp_phase, av_factor)) * prf / 2 / np.pi
+
+
+def doppler_centroids(data, az_length, rg_length):
+    # TODO - implement doppler centroid calculation
+    pass

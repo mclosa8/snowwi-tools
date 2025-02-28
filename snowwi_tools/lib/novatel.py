@@ -6,6 +6,7 @@ from scipy.interpolate import CubicSpline
 
 SECONDS_PER_WEEK = 604_800
 
+
 def read_novatel(file_path, skiprows=18, column_names=None):
     """
     Reads the NovAtel file from given path and returns it as a Pandas dataframe.
@@ -206,9 +207,9 @@ def novatel_to_dict(novatel_file):
 
 # TDBP uses by default line heading in the positive interval [0, 360].
 def get_cog(novatel, non_causal=False):
-    cog = novatel['GPSCOG'].to_numpy() # COG by default is [0, 360].
+    cog = novatel['GPSCOG'].to_numpy()  # COG by default is [0, 360].
     print(type(cog))
-    if non_causal: # Normalize cog to [-180, 180] interval
+    if non_causal:  # Normalize cog to [-180, 180] interval
         cog = np.array(
             [cog_i if cog_i < 180 else cog_i - 360 for cog_i in cog]
         )
@@ -238,7 +239,7 @@ def get_attitude_dictionary(novatel_df, fl_info):
     if flightline.shape[0] == 0:
         print("No flightline found.")
         return None
-    
+
     # Get time vector from flightline for velocities from GPS epoch
     time_vect = np.array(flightline['GPSSeconds'], dtype=float)
     time_vect += SECONDS_PER_WEEK * np.array(flightline['Week'])
@@ -247,9 +248,9 @@ def get_attitude_dictionary(novatel_df, fl_info):
     v_ecef, v_mags = get_velocities(ecef, time_vect)
 
     return {
-        'xyz': ecef,
-        'ypr': get_ypr(flightline),
-        'llh': get_llh(flightline),
+        'xyz': ecef,  # 3xN
+        'ypr': get_ypr(flightline),  # [3xN, 3x1]
+        'llh': get_llh(flightline),  # 3xN
         'ecef_vels': v_ecef,
         'mag_vels': v_mags,
         'time': time_vect
@@ -278,13 +279,14 @@ def retrieve_date_from_excel_database(dataframe, date):
     print(flightlines.shape)
     return flightlines
 
+
 def read_excel_database_and_get_date(flightline_xl, campaign, date):
     df1 = read_excel_database(flightline_xl, campaign)
     return retrieve_date_from_excel_database(df1, date)
 
 
 def ecef_2_tcn(ecef, time):
-    
+
     # Reference time to 0
     time = time - time[0]
 
@@ -310,7 +312,7 @@ def ecef_2_tcn(ecef, time):
         ideal_z
     ))
 
-    print(ideal_ecef.shape) # 3xN
+    print(ideal_ecef.shape)  # 3xN
     print(ideal_ecef[:, 0], ideal_ecef[:, -1])
 
     diff = ideal_ecef[:, -1] - ideal_ecef[:, 0]

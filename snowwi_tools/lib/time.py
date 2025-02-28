@@ -1,3 +1,4 @@
+
 """
     Time handling relatad functions.
 
@@ -51,9 +52,15 @@ def timestamp_from_header(header):
     return sum/122.88e6/4
 
 
-def timestamp_from_header_4x2(header):
+def timestamp_from_header_4x2(header, time_offset=0):
     print(header.shape)
     vec = np.array([2**48, 2**32, 2**16, 2**0])
     sum = np.dot(header.astype(np.uint64),
                  vec.astype(np.uint64))
-    return sum
+    return sum / 1000 + (time_offset + LEAP_SECONDS)  # time in s
+
+
+def timestamp_to_week_seconds(gps_timestamp):  # gps_timestamp in s
+    week = np.floor(gps_timestamp / SECONDS_IN_WEEK)
+    seconds = gps_timestamp % SECONDS_IN_WEEK
+    return {'Week': week, 'GPSSeconds': seconds}

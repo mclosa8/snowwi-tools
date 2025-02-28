@@ -14,7 +14,7 @@
 from scipy.constants import speed_of_light
 from snowwi_tools.utils import make_chirp_dict
 from snowwi_tools.ra.radar_processing import filter_and_compress
-from snowwi_tools.params import get_band_params_4x2, get_band_params
+from snowwi_tools.params import get_band_params_4x2, get_band_params_ettus
 from snowwi_tools.lib.file_handling import read_and_reshape, list_files_from_dir, combine_results
 import numpy as np
 import matplotlib.pyplot as plt
@@ -100,7 +100,8 @@ def parse_args():
     arg_parser.add_argument('--ettus', '-ettus', action='store_true',
                             help='If flag used, will range compress data using Ettus frequency plan.',
                             default=False)
-    arg_parser.add_argument('--interferometry', '-itf', action='store_true', default=False)
+    arg_parser.add_argument('--interferometry', '-itf',
+                            action='store_true', default=False)
 
     print("\n\nDEFAULT NUMBER OF SAMPLES PER PULSE SET TO NEW NUMBER OF SAMPLES\n\n")
 
@@ -138,7 +139,6 @@ def main():
     print()
 
     if 'all' in args.band:
-
         bands_to_process = ['low', 'high', 'c']
     else:
         bands_to_process = args.band
@@ -157,12 +157,14 @@ def main():
             channels_to_process = [0, 2]
         elif 1 in args.channel or 3 in args.channel:
             channels_to_process = [1, 3]
-        print(f'Doing interferometry. Processing channels {channels_to_process}')
+        print(
+            f'Doing interferometry. Processing channels {channels_to_process}')
         time.sleep(2)
 
     if args.save_fig:
         if not os.path.isdir(f'{args.save_fig}/{args.flightline}'):
-            print(f'{args.save_fig}/{args.flightline} not a directory. Creating it...')
+            print(
+                f'{args.save_fig}/{args.flightline} not a directory. Creating it...')
             os.mkdir(f'{args.save_fig}/{args.flightline}')
         else:
             print(f'{args.save_fig}/{args.flightline} already exists.')
@@ -196,6 +198,8 @@ def main():
         pp.pprint(f"Files to process: {filelist}")
         print('\n')
 
+        daq_params = get_band_params_4x2('daq')
+
         """
             results = p.starmap(
                 read_and_compress_local,
@@ -209,8 +213,8 @@ def main():
         with Pool(processes=os.cpu_count()) as p:
             tmp_results = p.starmap(
                 read_and_reshape,
-                [(file, N, HEADER_LENGTH,
-                  SKIP_SAMPLES, N)
+                [(file, daq_params['data_samps'], daq_params['header_samps'],
+                  SKIP_SAMPLES)
                  for file in filelist]
             )
 
@@ -223,10 +227,10 @@ def main():
 
             if args.ettus:
                 print('Using Ettus baseband frequency.\n')
-                band_params = get_band_params(band, chan)
+                band_params = get_band_params_ettus(band)
             else:
                 print('Using 4x2 baseband frequency.\n')
-                band_params = get_band_params_4x2(band, chan)
+                band_params = get_band_params_4x2(band)
 
             pp.pprint(f'Band parameters: {band_params}')
             print()
@@ -237,7 +241,7 @@ def main():
                 band_params['f_h'],
                 args.pulse_length,
                 band_params['chirp_type'],
-                SAMP_FREQ
+                daq_params['fs']
             )
 
             pp.pprint(f'\Reference chirp parameters: {chirp_dict}')
@@ -314,13 +318,13 @@ def main():
 
         plt.figure()
         plt.imshow(np.angle(interferogram), cmap='jet',
-            extent=[sr[0], sr[1], flight_time[-1], flight_time[0]],
-            aspect=.125e3)
+                   extent=[sr[0], sr[1], flight_time[-1], flight_time[0]],
+                   aspect=.125e3)
         plt.xlabel('Slant range (m)')
         plt.ylabel('Flight time (s)')
         if (args.save_fig):
-                plt.savefig(
-                    f"{args.save_fig}/{args.flightline}/{args.flightline}_{band}_{channels_to_process}_{args.process_from}_{args.num_files}_interf.png", dpi=500)
+            plt.savefig(
+                f"{args.save_fig}/{args.flightline}/{args.flightline}_{band}_{channels_to_process}_{args.process_from}_{args.num_files}_interf.png", dpi=500)
 
 
 if __name__ == "__main__":

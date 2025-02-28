@@ -20,8 +20,10 @@ from scipy.interpolate import CubicSpline
 from scipy.signal import correlate
 from snowwi_tools.signal import exp_chirp, butter_bandpass_filter
 
+
 def compensate_range_loss(data, range_bins, order=1):
     return data*range_bins**order
+
 
 def compress(data, f_h, f_l, tp, fs, type='down', window='hamming', pulse='causal'):
     n = int(fs*tp)
@@ -32,7 +34,7 @@ def compress(data, f_h, f_l, tp, fs, type='down', window='hamming', pulse='causa
     else:
         print('Using casual.')
         t = np.linspace(0, tp, n)
-        
+
     exp_ref = exp_chirp(t, f_l, tp, f_h)
     if type == 'down':
         exp_ref = exp_ref[::-1]
@@ -61,6 +63,7 @@ def compress(data, f_h, f_l, tp, fs, type='down', window='hamming', pulse='causa
 
     return compressed_data
 
+
 def range_loss_correct(scene):
     print("Correcting range loss....")
     ptp = 20*np.log10(abs(scene[500:520].T))
@@ -83,7 +86,7 @@ def process_rcmc_chunk(xin, data, Rfn, rng_samp):
         x = xin - Rfn[i]
         cs = CubicSpline(x, data[i], extrapolate=False)
         # Replace NaNs from Extrapolate to 1s.
-        rcmc[i] = np.nan_to_num(cs(np.arange(rng_samp)), nan=1)        
+        rcmc[i] = np.nan_to_num(cs(np.arange(rng_samp)), nan=1)
     print('Done!')
     return rcmc
 

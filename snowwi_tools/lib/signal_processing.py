@@ -13,6 +13,7 @@ import numpy as np
 
 from scipy.signal import butter, filtfilt, sosfilt
 
+
 def butter_bandpass(lowcut, highcut, fs, order=5):
     nyq = 0.5 * fs
     low = lowcut / nyq
@@ -51,6 +52,7 @@ def butter_lowpass_filter(data, highcut, fs, order=5):
     sos = butter_lowpass(highcut, fs, order=order)
     y = sosfilt(sos, data)
     return y
+
 
 def exp_chirp(t, f0, t1, f1, phi=0):
     K = (f1 - f0) / t1
