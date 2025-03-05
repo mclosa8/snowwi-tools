@@ -84,3 +84,7 @@ def average_n_rows(matrix, n):
             (averaged_matrix, matrix[-remainder:].mean(axis=0)))
 
     return averaged_matrix
+
+
+def normalize(data):
+    return (data/data.max())

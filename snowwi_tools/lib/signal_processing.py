@@ -7,6 +7,7 @@
 
     Changelog:
         - v0: Nov 13, 2024 - MCT
+        - v0.1: Mar 05, 2025 - Modified exp_chirp function to incorporate chirp type - MCT
 """
 
 import numpy as np
@@ -54,10 +55,13 @@ def butter_lowpass_filter(data, highcut, fs, order=5):
     return y
 
 
-def exp_chirp(t, f0, t1, f1, phi=0):
+def exp_chirp(t, f0, t1, f1, chirp_type, phi=0):
     K = (f1 - f0) / t1
     phase = 2 * np.pi * (f0 * t + 0.5 * K * t * t)
-    return np.exp(1j * (phase + phi * np.pi / 180))
+    exp_ref = np.exp(1j * (phase + phi * np.pi / 180))
+    if chirp_type == 'down':
+        return exp_ref[::-1]
+    return exp_ref
 
 
 def voltage_to_log_power(voltage):
