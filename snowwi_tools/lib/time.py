@@ -12,6 +12,12 @@
 
 import numpy as np
 
+import glob
+import os
+
+from snowwi_tools.lib.file_handling import get_headers_only
+
+from snowwi_tools.utils import natural_keys
 
 # Number of seconds between Unix epoch (1 January 1970) and GPS epoch (6 January 1980)
 GPS_UNIX_EPOCH_DIFF = 315964800
@@ -57,10 +63,28 @@ def timestamp_from_header_4x2(header, time_offset=0):
     vec = np.array([2**48, 2**32, 2**16, 2**0])
     sum = np.dot(header.astype(np.uint64),
                  vec.astype(np.uint64))
-    return sum / 1000 + (time_offset + LEAP_SECONDS)  # time in s
+    return sum / 1000 + (time_offset + LEAP_SECONDS)  # GPS time in s
 
 
 def timestamp_to_week_seconds(gps_timestamp):  # gps_timestamp in s
     week = np.floor(gps_timestamp / SECONDS_IN_WEEK)
     seconds = gps_timestamp % SECONDS_IN_WEEK
     return {'Week': week, 'GPSSeconds': seconds}
+
+
+def timestamp_from_files(filename, n_datasamps: int = 100_000, n_headersamps: int = 4, mode='snowwi', output='unix'):
+    if "*" in filename:  # List all files following a wildcard character
+        filelist = glob.glob(os.path.abspath(filename))
+        filelist = sorted(filelist, key=natural_keys)
+    else:  # Assumed single file - TODO: improve this
+        filelist = [filename]
+    headers = get_headers_only(filelist, n_datasamps, n_headersamps)
+    if mode == 'snowwi':
+        timestamps = timestamp_from_header_4x2(headers)  # In GPS time
+    elif mode == 'ettus':
+        timestamps = timestamp_from_header(headers)  # In GPS time
+
+    if output == 'unix':
+        # Unix = GPS Time + 315964800 - LEAP_SECONDS
+        return timestamps + GPS_UNIX_EPOCH_DIFF - LEAP_SECONDS
+    return timestamps

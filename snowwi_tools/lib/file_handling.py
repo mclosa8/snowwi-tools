@@ -387,3 +387,14 @@ def make_if_not_a_dir(path):
         os.makedirs(path)
     else:
         print(f"{path} already exists.")
+
+
+def get_headers_only(filelist: list, n_datasamps: int, n_headersamps: int):
+    # Filelist HAS to be a list, otherwise will throw an error
+    headers = []
+    for file in filelist:
+        uint_stream = np.fromfile(
+            file, dtype=np.uint16).reshape[-1, int(n_datasamps) + int(n_headersamps)]
+        print(uint_stream.shape)
+        headers.append(uint_stream[:, :n_headersamps])
+    return np.vstack(headers)
