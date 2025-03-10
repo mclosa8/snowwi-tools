@@ -17,6 +17,7 @@ import os
 
 from scipy.ndimage import convolve
 
+
 def average_n_rows(matrix, n):
     # Number of rows in the matrix
     N = matrix.shape[0]

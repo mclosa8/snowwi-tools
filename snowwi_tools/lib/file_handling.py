@@ -15,6 +15,7 @@ import boto3
 import glob
 import h5py
 import os
+import sys
 import time
 
 from snowwi_tools.ra.radar_processing import compress
@@ -243,6 +244,14 @@ def list_files_from_dir(directory, fr=0, to=-1):
     pp.pprint(datafile_list)
     pp.pprint(f"Number of files: {len(datafile_list)}")
 
+    if fr > len(datafile_list):
+        print("Invalid initial file.")
+        sys.exit(1)
+
+    if to > len(datafile_list):
+        print("Invalid last file. Processing until last file.")
+        to = -1
+
     timestamps_from_files = [
         float(f.split('/')[-1].split('_')[-1][:-4]) for f in datafile_list]
     # print(timestamps_from_files)
@@ -398,3 +407,57 @@ def get_headers_only(filelist: list, n_datasamps: int, n_headersamps: int):
         print(uint_stream.shape)
         headers.append(uint_stream[:, :n_headersamps])
     return np.vstack(headers)
+
+
+def to_binary(filename, data, dtype=np.float32):
+    filename = filename + '.dat'
+    print(f"Saving data to {filename}...")
+    data.astype(dtype).tofile(filename)
+    print(f"Saved {filename}.")
+
+
+def write_ann_file(filename, band, channel, band_params, daq_params, resolution, shape):
+    filename = filename + '.ann'
+
+    chan_dict = {
+        0: 'Co-pol, intf. chan 0',
+        1: 'X-pol, intf. chan 0',
+        2: 'Co-pol, intf. chan 1',
+        3: 'X-pol, intf. chan 1',
+    }
+
+    ann = f"""ANNOTATION FILE FOR SNOWWI REAL APERTURE FILES.
+
+GENERAL PARAMETERS: -----------------------------------------------------------
+    Sensor                              ;               SNOWWI
+    Band                                ;               {band}
+    Center frequency               (Hz) ;               {band_params['f0']:.3e}
+    Channel                             ;               {chan_dict[channel]}
+
+SAMPLING PARAMETERS: ----------------------------------------------------------
+    Azimuth samples                     ;               {shape[0]}
+    Range samples                       ;               {shape[1]}
+
+    Azimuth resolution              (m) ;               {resolution[0]:.4f}
+    Range resolution                (m) ;               {resolution[1]:.4f}
+
+NOTES:
+    - This dataset has **not** been compressed in azimuth or ground projected.
+
+    - Channel number relations:
+        Channel 0: Co-pol (VV), interferometric channel 0
+        Channel 1: X-pol (VH), interferometric channel 0
+        Channel 2: Co-pol (VV), interferometric channel 1
+        Channel 3: X-pol (VH), interferometric channel 1
+
+    - Encoded in float32. File reading suggestions:
+        Python: np.fromfile(<filename>, dtype=np.float32).reshape(<az_samples>, <range_samples>)
+        MATLAB: reshape(fread('<filename>', 'float32'), <az_samples>, <range_samples>);
+
+    - Units of linear power.
+"""
+
+    print(f"Writing .ann file to: {filename}...")
+    with open(filename, 'w') as f:
+        f.write(ann)
+    print(f"Writen {filename}.")

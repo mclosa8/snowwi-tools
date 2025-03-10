@@ -18,7 +18,9 @@ from multiprocessing import Pool
 from scipy.interpolate import CubicSpline
 
 from scipy.signal import correlate
-from snowwi_tools.signal import exp_chirp, butter_bandpass_filter
+from snowwi_tools.lib.signal_processing import exp_chirp, butter_bandpass_filter
+
+from snowwi_tools.ra.data_handling import average_submatrix
 
 
 def compensate_range_loss(data, range_bins, order=1):
@@ -35,9 +37,7 @@ def compress(data, f_h, f_l, tp, fs, type='down', window='hamming', pulse='causa
         print('Using casual.')
         t = np.linspace(0, tp, n)
 
-    exp_ref = exp_chirp(t, f_l, tp, f_h)
-    if type == 'down':
-        exp_ref = exp_ref[::-1]
+    exp_ref = exp_chirp(t, f_l, tp, f_h, type)
 
     if window == 'hanning':
         print('Using hanning window to compress...')
@@ -66,7 +66,8 @@ def compress(data, f_h, f_l, tp, fs, type='down', window='hamming', pulse='causa
 
 def range_loss_correct(scene):
     print("Correcting range loss....")
-    ptp = 20*np.log10(abs(scene[500:520].T))
+    idxs = int(scene.shape[0] / 2)
+    ptp = 20*np.log10(abs(scene[idxs:idxs+20].T))
     ptp_mean = np.mean(ptp, axis=1)
 
     rg_samps = np.arange(len(ptp_mean))
@@ -148,7 +149,7 @@ def parallel_rcmc(data, lambda_, fs_az, fs_rng, Rmin, Rmax, vp):
     return np.vstack(results)
 
 
-def filter_and_compress(data, params_dict, chirp_dict, order=6):
+def filter_and_compress(data, params_dict, chirp_dict, ml, order=6):
     # Filter according to specified band
     print('Filtering data according to:')
     print(params_dict)
@@ -163,7 +164,7 @@ def filter_and_compress(data, params_dict, chirp_dict, order=6):
     # Range compress and return
     print("Compressing data using:")
     print(chirp_dict)
-    return compress(
+    compressed = compress(
         filtered,
         chirp_dict['f_h'],
         chirp_dict['f_l'],
@@ -171,3 +172,12 @@ def filter_and_compress(data, params_dict, chirp_dict, order=6):
         chirp_dict['fs'],
         chirp_dict['chirp_type']
     )
+
+    if ml:
+        print(f"Multilooking... {ml}")
+        return average_submatrix(
+            abs(compressed),
+            ml[0],
+            ml[1]
+        )
+    return compressed

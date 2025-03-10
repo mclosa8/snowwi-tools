@@ -5,19 +5,31 @@
 
     Author: Marc Closa Tarres (MCT)
     Date: 2024-11-13
-    Version: v0
+    Version: v0.1
 
     Changelog:
         - v0: Nov 14, 2024 - MCT
+        - v0.1: March 7, 2025 - Added magnitude multilooking and output to binary - MCT
 """
+import matplotlib.pyplot as plt
+import numpy as np
 
 from scipy.constants import speed_of_light
-from snowwi_tools.utils import make_chirp_dict
-from snowwi_tools.ra.radar_processing import filter_and_compress
+
 from snowwi_tools.params import get_band_params_4x2, get_band_params_ettus
-from snowwi_tools.lib.file_handling import read_and_reshape, list_files_from_dir, combine_results
-import numpy as np
-import matplotlib.pyplot as plt
+from snowwi_tools.utils import make_chirp_dict, kn_to_mps, set_rcParams
+
+from snowwi_tools.lib.file_handling import read_and_reshape
+from snowwi_tools.lib.file_handling import list_files_from_dir
+from snowwi_tools.lib.file_handling import combine_results
+from snowwi_tools.lib.file_handling import make_if_not_a_dir
+from snowwi_tools.lib.file_handling import to_binary
+from snowwi_tools.lib.file_handling import write_ann_file
+
+from snowwi_tools.ra.data_handling import average_submatrix
+
+from snowwi_tools.ra.radar_processing import filter_and_compress
+from snowwi_tools.ra.radar_processing import range_loss_correct
 
 import argparse
 import glob
@@ -29,6 +41,7 @@ from multiprocessing import Pool
 from pprint import PrettyPrinter
 pp = PrettyPrinter()
 
+set_rcParams(plt)
 
 # Some hardcoded params I don't like...
 
@@ -92,16 +105,56 @@ def parse_args():
                             help='First file to process. If not specified, start from first file',
                             default=0, type=int)
     arg_parser.add_argument('--samples-per-pulse', '-n0',
-                            help='Number of radar samples per pulse.',
-                            type=int, default=100004)
-    arg_parser.add_argument('--save-fig', '-sf')
-    arg_parser.add_argument(
-        '--no-plot', '-np', action='store_true', default=False)
+                            help='Number of data samples per pulse. Default: 100_000',
+                            type=int,
+                            default=100000)
+    arg_parser.add_argument('--header-samples', '-hs',
+                            help="Sets the number of header samples per pulse. Default: 4.",
+                            default=4,
+                            type=int)
+    arg_parser.add_argument('--save-to', '-st',
+                            help="Output path. Default: cwd/output/flightline",
+                            default=os.getcwd())
+    arg_parser.add_argument('--save_fig', '-sf',
+                            help="Saves figure to output path if set. Default: False",
+                            action='store_true',
+                            default=False)
+    arg_parser.add_argument("--save_binary", "-sb",
+                            help="Saves binary AND annotation file to output path. Default: False",
+                            action='store_true',
+                            default=False)
+    arg_parser.add_argument('--no-plot', '-np',
+                            help="If flag active, does not show plot.",
+                            action='store_true',
+                            default=False)
     arg_parser.add_argument('--ettus', '-ettus', action='store_true',
                             help='If flag used, will range compress data using Ettus frequency plan.',
                             default=False)
     arg_parser.add_argument('--interferometry', '-itf',
                             action='store_true', default=False)
+    arg_parser.add_argument('--multilook', '-ml',
+                            help="Number of looks for output resolution (azimuth_looks, range_looks). Will multilook magnitude. #TODO: Implement complex multilooking.",
+                            nargs=2,
+                            type=int)
+    arg_parser.add_argument("--multilook-to-res", '-mltr',
+                            help="Define the output resolution, and subsequently calculates the number of looks in (azimuth_looks, range_looks). Will multilook magnitude. #TODO: Implement complex multilooking.",
+                            nargs=2,
+                            type=float)
+    arg_parser.add_argument("--platform-velocity", '-vel',
+                            help="Sets the platform velocity in knots for azimuth resolution calculations. Will be automatically converted to m/s. Default: 100 kn.",
+                            default=100,
+                            type=float)
+    arg_parser.add_argument("--calibration-factor", '-cal',
+                            help="Sets calibration factor, in dB. Will be automatically converted to linear scale. Will be applied as (SLC)^2 * <cal_factor>.",
+                            default=0,
+                            type=float)
+    arg_parser.add_argument('--colorlimits', '-clim',
+                            help=f"Overwrites the default colorlimits, in log units. Default: {CLIMS}.",
+                            nargs=2)
+    arg_parser.add_argument('--range-correction', '-rcorr',
+                            help='Corrects for range losses, at the expense of increasing noise floor. Default: False.',
+                            action='store_true',
+                            default=False)
 
     print("\n\nDEFAULT NUMBER OF SAMPLES PER PULSE SET TO NEW NUMBER OF SAMPLES\n\n")
 
@@ -126,7 +179,18 @@ def parse_args():
     channel_assert_msg = "Invalid channel. Please choose from: 0, 1, 2, 3"
     assert set(args.channel).issubset(set(ch_list)), channel_assert_msg
 
-    return arg_parser.parse_args(), path_to_flightline
+    save_to_msg = "Invalid output path."
+    assert os.path.isdir(args.save_to), save_to_msg
+    args.save_to = os.path.join(
+        os.path.abspath(args.save_to),
+        "outputs",
+        f"{args.flightline}"
+    )
+    args.calibration_factor = 10**(args.calibration_factor / 10)
+    print(args.calibration_factor)
+    args.platform_velocity = kn_to_mps(args.platform_velocity)
+
+    return args, path_to_flightline
 
 
 def main():
@@ -161,20 +225,20 @@ def main():
             f'Doing interferometry. Processing channels {channels_to_process}')
         time.sleep(2)
 
-    if args.save_fig:
-        if not os.path.isdir(f'{args.save_fig}/{args.flightline}'):
-            print(
-                f'{args.save_fig}/{args.flightline} not a directory. Creating it...')
-            os.mkdir(f'{args.save_fig}/{args.flightline}')
-        else:
-            print(f'{args.save_fig}/{args.flightline} already exists.')
+    if args.save_to:
+        make_if_not_a_dir(args.save_to)
 
     print(f"Pulse length used: {args.pulse_length}")
 
     if (args.save_fig):
-        print(f"Saving figure to: {args.save_fig}")
+        print(f"Saving figure to: {args.save_to}")
     else:
         print('Not saving figure.')
+
+    if (args.save_binary):
+        print(f"Saving binary and annotation file to: {args.save_to}")
+    else:
+        print('Not saving binary.')
     print()
 
     print(args.no_plot)
@@ -246,14 +310,39 @@ def main():
 
             pp.pprint(f'\Reference chirp parameters: {chirp_dict}')
 
+            az_res = args.platform_velocity / daq_params['prf']
+            rg_res = speed_of_light / daq_params['fs'] / 2
+            original_resolution = (az_res, rg_res)
+            print(f"Original data resolution (rg, az): {original_resolution}")
+            final_resolution = original_resolution
+
+            if args.multilook_to_res:
+                print(f"Multilooking to resolution: {args.multilook_to_res}")
+                ml_assert_msg = f"Invalid resolution. Final resolution must be larger than original resolution: {original_resolution}"
+                assert (args.multilook_to_res[0] > az_res) or (
+                    args.multilook_to_res[1] > rg_res), ml_assert_msg
+                az_looks = int(np.round(args.multilook_to_res[0] / az_res))
+                rg_looks = int(np.round(args.multilook_to_res[1] / rg_res))
+                args.multilook = (az_looks, rg_looks)
+
+            if args.multilook:
+                print(f"Number of looks (az, rg): {args.multilook}")
+                final_resolution = (
+                    az_res * args.multilook[0],  # Azimuth
+                    rg_res * args.multilook[1]   # Range
+                )
+                print(
+                    f"Output resolution (rg, az): ({final_resolution[0]:.2f}, {final_resolution[1]:.2f}) m.")
+
             # Split in chunks to paralellize BPF
             chunks = np.array_split(raw_data, os.cpu_count())
             print(len(chunks), chunks[0].shape, chunks[-1].shape)
-
+            # TODO - think about how to do the multilook on the go, elegantly
             with Pool(processes=os.cpu_count()) as p:
                 tmp_results = p.starmap(
                     filter_and_compress,
-                    [(chunk, band_params, chirp_dict) for chunk in chunks]
+                    [(chunk, band_params, chirp_dict, args.multilook)
+                     for chunk in chunks]
                 )
 
             # Reconstruct the RC matrix
@@ -274,51 +363,95 @@ def main():
             # This could be condensed into a single function but as of now
             # it'll stay like this...
 
-            flight_time = [
+            at = [
                 0,
-                rc.shape[0] * PRT
+                rc.shape[0] * final_resolution[0]
             ]
+            print(f"AT: {at}")
 
-            max_samp = np.argmax(abs(rc[3]))
-            print(max_samp)
+            # max_samp = np.argmax(abs(rc[3]))
+            # print(max_samp)
 
             sr = np.array([
-                -max_samp * SAMP_TIME,
-                (rc.shape[1] - max_samp) * SAMP_TIME
-            ]) * speed_of_light / 2
+                0,
+                rc.shape[1]
+            ]) * final_resolution[1]
+            print(f"SR: {sr}")
 
             im_ratio = rc.shape[0]/rc.shape[1]
             print(im_ratio)
 
-            plt.figure(figsize=(16, 9))
-            plt.imshow(20*np.log10(abs(rc)), cmap='gray', origin='upper',
-                       vmin=CLIMS[chan][0], vmax=CLIMS[chan][1],
-                       extent=[sr[0], sr[1], flight_time[-1], flight_time[0]],
-                       aspect=.125e3)
+            if args.range_correction:
+                print("Correcting for range loss...")
+                rc = range_loss_correct(rc)
+                print("Correction completed.")
+
+            if args.colorlimits:
+                vmin = args.colorlimits[0]
+                vmax = args.colorlimits[1]
+            else:
+                vmin = CLIMS[chan][0]
+                vmax = CLIMS[chan][1]
+
+            print(f"Applying calibration factor: {args.calibration_factor}")
+            as_ratio = abs((sr[1] - sr[0]) /
+                           (at[-1] - at[0]))
+            fig, ax = plt.subplots(figsize=(16, 9))
+            im = ax.imshow(10*np.log10((abs(rc)**2) * args.calibration_factor), cmap='gray', origin='upper',
+                           vmin=vmin, vmax=vmax,
+                           extent=[sr[0], sr[-1],
+                                   at[-1], at[0]],
+                           aspect='equal')
             plt.title(
                 f"RC image - Band: {band} - Channel: {chan} - ({args.process_from}, {args.process_from + args.num_files})")
-            plt.colorbar(label='(dB) - Uncal.')
             plt.xlabel('Slant range (m)')
-            plt.ylabel('Flight time (s)')
+            plt.ylabel('Along track (m)')
+
+            # Adjust colorbar to plot extent
+            from mpl_toolkits.axes_grid1 import make_axes_locatable
+            divider = make_axes_locatable(ax)
+            # Adjust size and padding
+            cax = divider.append_axes("right", size="5%", pad=0.1)
+            cbar = plt.colorbar(im, cax=cax, label='(dB)')
+
             # plt.draw()
             # plt.pause(0.001)
+            figname = f"{args.flightline}_{band}_{chan}_{args.process_from}_{args.num_files}_rc{args.range_correction}"
             if (args.save_fig):
                 plt.savefig(
-                    f"{args.save_fig}/{args.flightline}/{args.flightline}_{band}_{chan}_{args.process_from}_{args.num_files}.png", dpi=500)
+                    os.path.join(
+                        args.save_to,
+                        figname + ".png"),
+                    dpi=500
+                )
             if (args.no_plot):
                 print("Clearing fig...")
                 plt.close()
             plt.close()
             time.sleep(1)
 
-    # plt.show()
+            if args.save_binary:
+                output = os.path.join(
+                    args.save_to,
+                    figname
+                )
+                to_binary(output, rc**2 * args.calibration_factor)
+                write_ann_file(
+                    output,
+                    band,
+                    chan,
+                    band_params,
+                    daq_params,
+                    final_resolution,
+                    rc.shape
+                )
 
     if args.interferometry:
         interferogram = ref * np.conjugate(rc)
 
         plt.figure()
         plt.imshow(np.angle(interferogram), cmap='jet',
-                   extent=[sr[0], sr[1], flight_time[-1], flight_time[0]],
+                   extent=[sr[0], sr[1], at[-1], at[0]],
                    aspect=.125e3)
         plt.xlabel('Slant range (m)')
         plt.ylabel('Flight time (s)')
@@ -329,6 +462,8 @@ def main():
 
 if __name__ == "__main__":
     try:
+        now = time.time()
         main()
+        print(f"Elapsed: {time.time() - now} s.")
     except KeyboardInterrupt:
         print("Script interrupted.")
