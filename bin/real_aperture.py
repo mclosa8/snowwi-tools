@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-    Real aperture field processing for SNOWWI. 
+    Real aperture field processing for SNOWWI.
 
     Author: Marc Closa Tarres (MCT)
     Date: 2024-11-13
@@ -87,23 +87,31 @@ def parse_args():
 
     arg_parser = argparse.ArgumentParser(add_help=True)
 
-    arg_parser.add_argument('path', help='/path/to/data/to/process')
-    arg_parser.add_argument(
-        'flightline', help='Fligtline ID (YYYYMMDDThhmmss)')
-    arg_parser.add_argument('--channel', '-c', help='DAQ system channel',
-                            type=int, nargs='+', required=True)
+    arg_parser.add_argument('path',
+                            help='/path/to/data/to/process')
+    arg_parser.add_argument('flightline',
+                            help='Fligtline ID (YYYYMMDDThhmmss)')
+    arg_parser.add_argument('--channel', '-c',
+                            help='DAQ system channel',
+                            type=int,
+                            nargs='+',
+                            required=True)
     arg_parser.add_argument('--band', '-b',
                             help='SNOWWI band: low, high, c, all',
                             default='all',
-                            nargs='+', required=True)
+                            nargs='+',
+                            required=True)
     arg_parser.add_argument('--pulse-length', '-pl', help='Chirp length in s',
-                            default=16.5e-6, type=float)
+                            default=16.5e-6,
+                            type=float)
     arg_parser.add_argument('--num-files', '-nf',
                             help='Number of files to process. If number is larger than number of files collected, process all. If not specified, process 100 files.',
-                            default=100, type=int)
+                            default=100,
+                            type=int)
     arg_parser.add_argument('--process-from', '-pf',
                             help='First file to process. If not specified, start from first file',
-                            default=0, type=int)
+                            default=0,
+                            type=int)
     arg_parser.add_argument('--samples-per-pulse', '-n0',
                             help='Number of data samples per pulse. Default: 100_000',
                             type=int,
@@ -112,6 +120,10 @@ def parse_args():
                             help="Sets the number of header samples per pulse. Default: 4.",
                             default=4,
                             type=int)
+    arg_parser.add_argument("--skip-samples", '-ss',
+                            help="Samples to skip from pulse start. Defaulf: 0.",
+                            type=int,
+                            default=0)
     arg_parser.add_argument('--save-to', '-st',
                             help="Output path. Default: cwd/output/flightline",
                             default=os.getcwd())
@@ -156,9 +168,9 @@ def parse_args():
                             action='store_true',
                             default=False)
 
-    print("\n\nDEFAULT NUMBER OF SAMPLES PER PULSE SET TO NEW NUMBER OF SAMPLES\n\n")
-
     args = arg_parser.parse_args()
+    print(args)
+    print("\n\nDEFAULT NUMBER OF SAMPLES PER PULSE SET TO NEW NUMBER OF SAMPLES\n\n")
 
     # Deal with args that need special treatment
     path_to_flightline = os.path.join(args.path, args.flightline)
@@ -213,6 +225,22 @@ def main():
         channels_to_process = [0, 1, 2, 3]
     else:
         channels_to_process = args.channel
+
+    # The ettus messes everything up so we have to create special cases.
+    if args.ettus:
+        tmp = []
+        if 'low' in bands_to_process:
+            if 0 in channels_to_process:
+                tmp.append(0)
+            if 1 in channels_to_process:
+                tmp.append(2)
+        if 'high' in bands_to_process:
+            if 0 in channels_to_process:
+                tmp.append(1)
+            if 1 in channels_to_process:
+                tmp.append(3)
+        channels_to_process = tmp
+
     print(f"Channels to process: {channels_to_process}")
     print()
 
@@ -262,7 +290,12 @@ def main():
         pp.pprint(f"Files to process: {filelist}")
         print('\n')
 
-        daq_params = get_band_params_4x2('daq')
+        if args.ettus:
+            print("Using Ettus DAQ parameters...")
+            daq_params = get_band_params_ettus('daq')
+        else:
+            print("Using 4x2 DAQ parameters...")
+            daq_params = get_band_params_4x2('daq')
 
         """
             results = p.starmap(
@@ -278,7 +311,7 @@ def main():
             tmp_results = p.starmap(
                 read_and_reshape,
                 [(file, daq_params['data_samps'], daq_params['header_samps'],
-                  SKIP_SAMPLES)
+                  args.skip_samples)
                  for file in filelist]
             )
 
@@ -291,10 +324,24 @@ def main():
 
             if args.ettus:
                 print('Using Ettus baseband frequency.\n')
-                band_params = get_band_params_ettus(band)
+                print(chan)
+                if chan in [0, 1]:
+                    ch = 0
+                elif chan in [2, 3]:
+                    ch = 1
+                band_params = get_band_params_ettus(band, ch)
             else:
                 print('Using 4x2 baseband frequency.\n')
                 band_params = get_band_params_4x2(band)
+
+            save_to = os.path.join(
+                args.save_to,
+                f"{band}",
+                f"chan{chan}"
+            )
+            print(f"Full output path: {save_to}")
+
+            make_if_not_a_dir(save_to)
 
             pp.pprint(f'Band parameters: {band_params}')
             print()
@@ -420,7 +467,7 @@ def main():
             if (args.save_fig):
                 plt.savefig(
                     os.path.join(
-                        args.save_to,
+                        save_to,
                         figname + ".png"),
                     dpi=500
                 )
@@ -432,7 +479,7 @@ def main():
 
             if args.save_binary:
                 output = os.path.join(
-                    args.save_to,
+                    save_to,
                     figname
                 )
                 to_binary(output, rc**2 * args.calibration_factor)
@@ -441,7 +488,6 @@ def main():
                     band,
                     chan,
                     band_params,
-                    daq_params,
                     final_resolution,
                     rc.shape
                 )

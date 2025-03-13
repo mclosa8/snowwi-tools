@@ -416,7 +416,7 @@ def to_binary(filename, data, dtype=np.float32):
     print(f"Saved {filename}.")
 
 
-def write_ann_file(filename, band, channel, band_params, daq_params, resolution, shape):
+def write_ann_file(filename, band, channel, band_params, resolution, shape, ettus=False):
     filename = filename + '.ann'
 
     chan_dict = {
@@ -449,6 +449,38 @@ NOTES:
         Channel 1: X-pol (VH), interferometric channel 0
         Channel 2: Co-pol (VV), interferometric channel 1
         Channel 3: X-pol (VH), interferometric channel 1
+
+    - Encoded in float32. File reading suggestions:
+        Python: np.fromfile(<filename>, dtype=np.float32).reshape(<az_samples>, <range_samples>)
+        MATLAB: reshape(fread('<filename>', 'float32'), <az_samples>, <range_samples>);
+
+    - Units of linear power.
+"""
+
+    if ettus:
+        ann = f"""ANNOTATION FILE FOR SNOWWI REAL APERTURE FILES.
+
+GENERAL PARAMETERS: -----------------------------------------------------------
+    Sensor                              ;               SNOWWI
+    Band                                ;               {band}
+    Center frequency               (Hz) ;               {band_params['f0']:.3e}
+    Channel                             ;               {chan_dict[channel]}
+
+SAMPLING PARAMETERS: ----------------------------------------------------------
+    Azimuth samples                     ;               {shape[0]}
+    Range samples                       ;               {shape[1]}
+
+    Azimuth resolution              (m) ;               {resolution[0]:.4f}
+    Range resolution                (m) ;               {resolution[1]:.4f}
+
+NOTES:
+    - This dataset has **not** been compressed in azimuth or ground projected.
+
+    - Channel number relations:
+        Channel 0: Ku-Low (13.6 GHz), V-pol
+        Channel 1: Ku-High (17.2 GHz), V-pol
+        Channel 2: Ku-Low (13.6 GHz), interferometric channel 1 / X-pol
+        Channel 3: Ku-High (17.2 GHz), interferometric channel 1 / X-pol
 
     - Encoded in float32. File reading suggestions:
         Python: np.fromfile(<filename>, dtype=np.float32).reshape(<az_samples>, <range_samples>)
