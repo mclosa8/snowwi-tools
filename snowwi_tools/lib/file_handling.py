@@ -22,6 +22,8 @@ from snowwi_tools.ra.radar_processing import compress
 from snowwi_tools.lib.signal_processing import butter_bandpass_filter
 from snowwi_tools.utils import natural_keys
 
+from multiprocessing import Pool
+
 
 def download_from_s3(bucket, key, local_path):
     s3 = boto3.client('s3')
@@ -239,7 +241,12 @@ def list_files_from_bucket(bucket, prefix, flightline, channel):
 def list_files_from_dir(directory, fr=0, to=-1):
     import pprint
     pp = pprint.PrettyPrinter(indent=4)
-    datafile_list = glob.glob(os.path.join(directory, '*.dat'))
+    ptr = directory
+    print(ptr)
+    if not str.endswith(".dat"):
+        ptr = os.path.join(ptr, '*.dat')
+        print(ptr)
+    datafile_list = glob.glob(ptr)
     datafile_list.sort(key=natural_keys)
     pp.pprint(datafile_list)
     pp.pprint(f"Number of files: {len(datafile_list)}")
@@ -398,14 +405,28 @@ def make_if_not_a_dir(path):
         print(f"{path} already exists.")
 
 
+def read_header(file, n_datasamps, n_headersamps, i):
+    print(i)
+    return np.fromfile(
+        file, dtype=np.uint16
+    ).reshape(-1, int(n_datasamps + n_headersamps))[:, :n_headersamps]
+
+
 def get_headers_only(filelist: list, n_datasamps: int, n_headersamps: int):
-    # Filelist HAS to be a list, otherwise will throw an error
+    # Filelist HAS to be a list, otherwise will throw an error 
     headers = []
-    for file in filelist:
-        uint_stream = np.fromfile(
-            file, dtype=np.uint16).reshape[-1, int(n_datasamps) + int(n_headersamps)]
-        print(uint_stream.shape)
-        headers.append(uint_stream[:, :n_headersamps])
+
+    with Pool(os.cpu_count()) as p:
+        headers = p.starmap(
+            read_header,
+            [(file, n_datasamps, n_headersamps, i) for i, file in enumerate(filelist)]
+        )
+    print(len(headers))
+    # for i, file in enumerate(filelist):
+    #     head_uint = np.fromfile(
+    #         file, dtype=np.uint16).reshape(-1, int(n_datasamps) + int(n_headersamps))[:, :n_headersamps]
+    #     print(i, head_uint.shape)
+    #     headers.append(head_uint)
     return np.vstack(headers)
 
 
