@@ -62,11 +62,8 @@ def read_and_compress_aws(bucket, key, local_path,
     print(f'Removing file: {ftd} from {local_path}...')
     os.remove(ftd)
     if filter is not None:
-        # filter[0] = lowcut
-        # filter[1] = highcut
-        # filter[2] = fs
         reshaped_data = butter_bandpass_filter(
-            reshaped_data, filter[0], filter[1], filter[2])
+            reshaped_data, filter['lowcut'], filter['highcut'], filter['fs'])
 
     print(f"Reshaped data shape: {reshaped_data.shape}")
     print('Compressing data...')
@@ -105,11 +102,8 @@ def read_and_compress_local(data_path,
     reshaped_data = dict['data']
     headers = dict['headers']
     if filter is not None:
-        # filter[0] = lowcut
-        # filter[1] = highcut
-        # filter[2] = fs
         reshaped_data = butter_bandpass_filter(
-            reshaped_data, filter[0], filter[1], filter[2])
+            reshaped_data, filter['lowcut'], filter['highcut'], filter['fs'])
 
     print(f"Reshaped data shape: {reshaped_data.shape}")
     print('Compressing data...')
