@@ -86,7 +86,7 @@ def read_and_compress_aws(bucket, key, local_path,
 
 def read_and_compress_local(data_path,
                             N, header_samples, skip_samples, last_samp,
-                            chirp, window, filter
+                            chirp, window, filter, data_only: bool
                             ):
     print(data_path)
     print(N, header_samples, skip_samples, last_samp)
@@ -117,6 +117,11 @@ def read_and_compress_local(data_path,
     print('Data compressed.')
     del (reshaped_data)
 
+    if data_only:
+        print("Returning only data...")
+        print(compressed_data.shape)
+        return compressed_data
+    print("Returning data + timestamps dict...")
     return {
         'data': compressed_data,
         'headers': headers,
@@ -360,6 +365,30 @@ def read_and_reshape(filename, N, header_samples=0, skip_samples=0, truncate=Non
         'timestamp': timestamps,
         'headers': headers
     }
+
+def combine_results_data_only(rets):
+    num_of_files = len(rets)
+    print(f"Number of files: {num_of_files}")
+
+    num_samps = rets[0].shape[1]
+
+    min_length = min([ret.shape[0] for ret in rets])
+    max_length = max([ret.shape[0] for ret in rets])
+
+    data = np.empty((num_of_files * max_length, num_samps), dtype=np.complex64)
+
+    if min_length != max_length:
+        print(f"Minimum length: {min_length}")
+        print(f"Maximum length: {max_length}")
+        data = np.empty(((num_of_files - 1) * max_length +
+                        min_length, num_samps), dtype=np.complex64)
+
+    for i, ret in enumerate(rets):
+        data[i*max_length:(i+1)*max_length, :] = ret['data']
+
+    print(data.dtype)
+
+    return data    
 
 
 def combine_results(rets):
