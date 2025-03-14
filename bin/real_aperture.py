@@ -167,6 +167,10 @@ def parse_args():
                             help='Corrects for range losses, at the expense of increasing noise floor. Default: False.',
                             action='store_true',
                             default=False)
+    arg_parser.add_argument('--range-fft', '-rfft',
+                            help='Calculates the an FFT in the range direction.',
+                            action='store_true',
+                            default=False)
 
     args = arg_parser.parse_args()
     print(args)
@@ -490,6 +494,23 @@ def main():
                     band_params,
                     final_resolution,
                     rc.shape
+                )
+
+            if args.range_fft:
+                print("Calculating range FFT...")
+                rc_sh = rc.shape
+                fft = np.fft.fft(rc[rc_sh[0] - 20:rc_sh[0]+20])
+                freqs = np.linspace(0, 1, rc_sh[1]) * daq_params['fs']
+                plt.figure()
+                plt.plot(freqs, 20*np.log10(abs(fft)).T)
+                plt.xlabel('Frequency (Hz)')
+                plt.ylabel('PSD (dB)')
+                plt.savefig(
+                    os.path.join(
+                        save_to,
+                        figname+"fft.png"
+                    ),
+                    dpi=500
                 )
 
     if args.interferometry:
