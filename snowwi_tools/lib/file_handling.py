@@ -86,14 +86,14 @@ def read_and_compress_aws(bucket, key, local_path,
 
 def read_and_compress_local(data_path,
                             N, header_samples, skip_samples, last_samp,
-                            chirp, window, filter=None
+                            chirp, window, filter
                             ):
     print(data_path)
     print(N, header_samples, skip_samples, last_samp)
     filename = data_path.split('/')[-1]
     timestamp = filename.split('_')[-1][:-4]
     print('timestamp', timestamp)
-    print(f"Reading {data_path} from Synology disk...")
+    print(f"Reading {data_path}...")
 
     dict = read_and_reshape(data_path, N,
                             header_samples=header_samples,
@@ -236,14 +236,17 @@ def list_files_from_dir(directory, fr=0, to=-1):
     import pprint
     pp = pprint.PrettyPrinter(indent=4)
     ptr = directory
+    print(fr, to)
     print(ptr)
-    if not str.endswith(".dat"):
+    if not ptr.endswith(".dat"):
         ptr = os.path.join(ptr, '*.dat')
         print(ptr)
+    print(os.path.abspath(ptr))
     datafile_list = glob.glob(ptr)
     datafile_list.sort(key=natural_keys)
-    pp.pprint(datafile_list)
-    pp.pprint(f"Number of files: {len(datafile_list)}")
+    pp.pprint(f"Total number of files: {len(datafile_list)}")
+    print(datafile_list[0])
+    print(datafile_list[-1])
 
     if fr > len(datafile_list):
         print("Invalid initial file.")
@@ -255,8 +258,16 @@ def list_files_from_dir(directory, fr=0, to=-1):
 
     timestamps_from_files = [
         float(f.split('/')[-1].split('_')[-1][:-4]) for f in datafile_list]
-    # print(timestamps_from_files)
-    return datafile_list[fr:to], timestamps_from_files[fr:to]
+    
+    datafile_list = datafile_list[fr:to]
+    print(datafile_list[0])
+    print(datafile_list[-1])
+
+    timestamps_from_files = timestamps_from_files[fr:to]
+    print(len(timestamps_from_files))
+    
+    print("Returning...")
+    return datafile_list, timestamps_from_files
 
 
 def define_files_to_process(datafile_list, read_from_to):
@@ -327,7 +338,8 @@ def read_and_reshape(filename, N, header_samples=0, skip_samples=0, truncate=Non
     n = N + header_samples
 
     data = np.fromfile(filename, dtype=np.int16)
-    if truncate is None:
+    if (truncate is None) or (truncate == ""):
+        print("Not truncating...")
         truncate_idx = None
     else:
         truncate_idx = truncate + header_samples
