@@ -31,26 +31,26 @@ def compress(data, f_h, f_l, tp, fs, type='down', window='hamming', pulse='causa
     n = int(fs*tp)
 
     if pulse == 'non-causal':
-        print('Using non-casual.')
+        # print('Using non-casual.')
         t = np.linspace(-tp/2, tp/2, n)
     else:
-        print('Using casual.')
+        # print('Using casual.')
         t = np.linspace(0, tp, n)
 
     exp_ref = exp_chirp(t, f_l, tp, f_h, type)
 
     if window == 'hanning':
-        print('Using hanning window to compress...')
+        # print('Using hanning window to compress...')
         exp_ref = exp_ref*np.hanning(len(exp_ref))
     elif window == 'hamming':
-        print('Using hamming window to compress...')
+        # print('Using hamming window to compress...')
         exp_ref = exp_ref*np.hamming(len(exp_ref))
     else:
         print('No windowing applied...')
 
-    print('Allocating memory...')
+    # print('Allocating memory...')
     compressed_data = np.zeros_like(data, dtype=np.complex64)
-    print('Memory allocated.')
+    # print('Memory allocated.')
 
     ctr = 0
 
@@ -58,8 +58,8 @@ def compress(data, f_h, f_l, tp, fs, type='down', window='hamming', pulse='causa
         compressed_data[ctr] = correlate(
             row, exp_ref, mode='same', method='fft')
         ctr = ctr + 1
-        if ctr % 100 == 0:
-            print(f"Counter: {ctr}")
+        # if ctr % 100 == 0:
+            # print(f"Counter: {ctr}")
 
     return compressed_data
 

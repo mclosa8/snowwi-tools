@@ -60,7 +60,7 @@ def exp_chirp(t, f0, t1, f1, chirp_type, phi=0):
     phase = 2 * np.pi * (f0 * t + 0.5 * K * t * t)
     exp_ref = np.exp(1j * (phase + phi * np.pi / 180))
     if chirp_type == 'down':
-        return exp_ref[::-1]
+        return np.conjugate(exp_ref[::-1])
     return exp_ref
 
 

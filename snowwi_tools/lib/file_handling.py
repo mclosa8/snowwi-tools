@@ -88,12 +88,12 @@ def read_and_compress_local(data_path,
                             N, header_samples, skip_samples, last_samp,
                             chirp, window, filter, data_only: bool
                             ):
-    print(data_path)
-    print(N, header_samples, skip_samples, last_samp)
+    # print(data_path)
+    # print(N, header_samples, skip_samples, last_samp)
     filename = data_path.split('/')[-1]
     timestamp = filename.split('_')[-1][:-4]
-    print('timestamp', timestamp)
-    print(f"Reading {data_path}...")
+    # print('timestamp', timestamp)
+    # print(f"Reading {data_path}...")
 
     dict = read_and_reshape(data_path, N,
                             header_samples=header_samples,
@@ -105,8 +105,8 @@ def read_and_compress_local(data_path,
         reshaped_data = butter_bandpass_filter(
             reshaped_data, filter['lowcut'], filter['highcut'], filter['fs'])
 
-    print(f"Reshaped data shape: {reshaped_data.shape}")
-    print('Compressing data...')
+    # print(f"Reshaped data shape: {reshaped_data.shape}")
+    # print('Compressing data...')
     compressed_data = compress(reshaped_data,
                                chirp['f_h'],
                                chirp['f_l'],
@@ -114,12 +114,12 @@ def read_and_compress_local(data_path,
                                chirp['fs'],
                                type=chirp['chirp_type'],
                                window=window)
-    print('Data compressed.')
+    # print('Data compressed.')
     del (reshaped_data)
 
     if data_only:
-        print("Returning only data...")
-        print(compressed_data.shape)
+        # print("Returning only data...")
+        # print(compressed_data.shape)
         return compressed_data
     print("Returning data + timestamps dict...")
     return {
@@ -344,7 +344,7 @@ def read_and_reshape(filename, N, header_samples=0, skip_samples=0, truncate=Non
 
     data = np.fromfile(filename, dtype=np.int16)
     if (truncate is None) or (truncate == ""):
-        print("Not truncating...")
+        # print("Not truncating...")
         truncate_idx = None
     else:
         truncate_idx = truncate + header_samples
@@ -352,10 +352,10 @@ def read_and_reshape(filename, N, header_samples=0, skip_samples=0, truncate=Non
     print(data.shape)
 
     headers = data[:, :header_samples].astype(np.uint16)
-    print(f"Headers: {headers.shape}")
+    # print(f"Headers: {headers.shape}")
 
     data = np.delete(data, np.s_[:skip_samples + header_samples], axis=1)
-    print(f"Data after: {data.shape}")
+    # print(f"Data after: {data.shape}")
 
     timestamp = float(filename.split('_')[-1][:-4])
     timestamps = np.ones(data.shape[0]) * timestamp
