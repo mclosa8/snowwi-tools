@@ -93,7 +93,7 @@ def read_and_compress_local(data_path,
     filename = data_path.split('/')[-1]
     timestamp = filename.split('_')[-1][:-4]
     # print('timestamp', timestamp)
-    # print(f"Reading {data_path}...")
+    print(f"Compressing {data_path}...")
 
     dict = read_and_reshape(data_path, N,
                             header_samples=header_samples,
@@ -335,11 +335,11 @@ def get_flightline_params_from_rc(filename):
 
 
 def read_and_reshape(filename, N, header_samples=0, skip_samples=0, truncate=None):
-    print(f"Reading file:")
-    print(f"    {filename}")
+    # print(f"Reading file:")
+    # print(f"    {filename}")
 
-    print(N, header_samples, skip_samples)
-    print(N + header_samples)
+    # print(N, header_samples, skip_samples)
+    # print(N + header_samples)
     n = N + header_samples
 
     data = np.fromfile(filename, dtype=np.int16)
@@ -349,7 +349,7 @@ def read_and_reshape(filename, N, header_samples=0, skip_samples=0, truncate=Non
     else:
         truncate_idx = truncate + header_samples
     data = data.reshape(-1, N + header_samples)[:, :truncate_idx]
-    print(data.shape)
+    # print(data.shape)
 
     headers = data[:, :header_samples].astype(np.uint16)
     # print(f"Headers: {headers.shape}")
