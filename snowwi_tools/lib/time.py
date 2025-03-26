@@ -30,22 +30,29 @@ LEAP_SECONDS = 18
 
 
 def gps_to_unix(gps_week, gps_seconds):
-    return convert_week_to_seconds(gps_week, gps_seconds) + GPS_UNIX_EPOCH_DIFF
+    return convert_week_to_seconds(gps_week, gps_seconds) + GPS_UNIX_EPOCH_DIFF - LEAP_SECONDS
 
 
 def convert_week_to_seconds(week, seconds):
     return week * SECONDS_IN_WEEK + seconds
 
 
-def unix_to_gps_time(unix_time):
-    # Calculate GPS time in seconds
-    gps_time_seconds = unix_time - GPS_UNIX_EPOCH_DIFF
-
+def seconds_to_week_seconds(seconds):
     # Calculate GPS weeks and the remaining seconds
-    gps_week = gps_time_seconds // SECONDS_IN_WEEK
-    gps_seconds = gps_time_seconds % SECONDS_IN_WEEK
+    gps_week = seconds // SECONDS_IN_WEEK
+    gps_seconds = seconds % SECONDS_IN_WEEK
 
-    return int(gps_week), int(gps_seconds)
+    return int(gps_week), gps_seconds
+    
+
+def unix_to_gps_time(unix_time, output='week seconds'):
+    # Calculate GPS time in seconds
+    gps_time_seconds = unix_time - GPS_UNIX_EPOCH_DIFF + LEAP_SECONDS
+
+    if output == 'week seconds':
+        return seconds_to_week_seconds(gps_time_seconds)
+
+    return gps_time_seconds
 
 
 def timestamp_from_header(header):
