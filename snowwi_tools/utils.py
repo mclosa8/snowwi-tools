@@ -88,3 +88,24 @@ def average_n_rows(matrix, n):
 
 def normalize(data):
     return (data/data.max())
+
+
+def vertical_colorbar(ax, im, label=""):
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+    """
+    Adds a vertical colorbar next to an imshow plot and makes it match the plot height.
+
+    Parameters:
+        ax (matplotlib.axes.Axes): The axis where the image is plotted.
+        im (matplotlib.image.AxesImage): The result from ax.imshow(...).
+        label (str): Label for the colorbar (optional).
+    
+    Returns:
+        cbar (matplotlib.colorbar.Colorbar): The created colorbar object.
+    """
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.1)
+    cbar = ax.figure.colorbar(im, cax=cax)
+    if label:
+        cbar.set_label(label)
+    return cbar
