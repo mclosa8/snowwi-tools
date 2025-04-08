@@ -264,7 +264,11 @@ def list_files_from_dir(directory, fr=0, to=-1):
     timestamps_from_files = [
         float(f.split('/')[-1].split('_')[-1][:-4]) for f in datafile_list]
     
-    datafile_list = datafile_list[fr:to]
+    if to == -1:
+        datafile_list = datafile_list[fr:]
+    else:
+        datafile_list = datafile_list[fr:to]
+    print(len(datafile_list))
     print(datafile_list[0])
     print(datafile_list[-1])
 
@@ -347,7 +351,8 @@ def read_and_reshape(filename, N, header_samples=0, skip_samples=0, truncate=Non
         # print("Not truncating...")
         truncate_idx = None
     else:
-        truncate_idx = truncate + header_samples
+        truncate_idx = int(truncate + header_samples)
+        
     data = data.reshape(-1, N + header_samples)[:, :truncate_idx]
     # print(data.shape)
 
