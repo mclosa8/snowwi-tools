@@ -109,3 +109,11 @@ def vertical_colorbar(ax, im, label=""):
     if label:
         cbar.set_label(label)
     return cbar
+
+
+def wrap_to_half(data, value):
+    return ((data + value/2) % value) - value/2
+
+
+def wrap_to_full(data, value):
+    return data % value

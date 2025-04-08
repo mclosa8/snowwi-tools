@@ -328,3 +328,13 @@ def ecef_2_tcn(ecef, time):
     ))
 
     return tcn
+
+def normalize_to_full(angle, units='deg'):
+    if units == 'rad':
+        return angle % 2*np.pi
+    return angle % 360
+
+def normalize_to_half(angle, units='deg'):
+    if units == 'rad':
+        return ((angle + np.pi) % 360) - np.pi
+    return ((angle + 180) % 360) - 180

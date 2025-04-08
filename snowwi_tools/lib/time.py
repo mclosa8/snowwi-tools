@@ -32,6 +32,9 @@ LEAP_SECONDS = 18
 def gps_to_unix(gps_week, gps_seconds):
     return convert_week_to_seconds(gps_week, gps_seconds) + GPS_UNIX_EPOCH_DIFF - LEAP_SECONDS
 
+def gps_sec_to_unix(gps_seconds):
+    return gps_seconds + GPS_UNIX_EPOCH_DIFF - LEAP_SECONDS
+
 
 def convert_week_to_seconds(week, seconds):
     return week * SECONDS_IN_WEEK + seconds
