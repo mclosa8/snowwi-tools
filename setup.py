@@ -11,7 +11,11 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/mclosa8/snowwi-tools",
     packages=find_packages(),
-    scripts=glob.glob('bin/*.py'),
+    scripts=sum([glob.glob('bin/*.py'),
+             glob.glob('bin/*.sh'),
+             glob.glob('bin/aws/*'),
+             glob.glob('bin/setup/*')
+             ], []),
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
