@@ -97,7 +97,7 @@ def read_and_compress_local(data_path,
 
     dict = read_and_reshape(data_path, N,
                             header_samples=header_samples,
-                            skip_samples=skip_samples,
+                            skip_samples=0,
                             truncate=last_samp)
     reshaped_data = dict['data']
     headers = dict['headers']
@@ -113,7 +113,7 @@ def read_and_compress_local(data_path,
                                chirp['tp'],
                                chirp['fs'],
                                type=chirp['chirp_type'],
-                               window=window)
+                               window=window)[:, skip_samples:]
     # print('Data compressed.')
     del (reshaped_data)
 
