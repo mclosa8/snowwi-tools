@@ -253,7 +253,8 @@ def get_attitude_dictionary(novatel_df, fl_info):
         'llh': get_llh(flightline),  # 3xN
         'ecef_vels': v_ecef,
         'mag_vels': v_mags,
-        'time': time_vect
+        'time': time_vect,
+        'heading': np.array(flightline['Heading'], dtype=float)
     }
 
 
