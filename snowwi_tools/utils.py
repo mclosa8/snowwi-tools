@@ -14,6 +14,10 @@ import re
 
 from scipy.constants import speed_of_light
 
+from matplotlib.colors import LinearSegmentedColormap
+
+
+cmyc_cmap = LinearSegmentedColormap.from_list('cmyc', ['cyan', 'magenta', 'yellow', 'cyan'])
 
 def atoi(text): return int(text) if text.isdigit() else text
 
