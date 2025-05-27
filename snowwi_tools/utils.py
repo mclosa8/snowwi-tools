@@ -56,7 +56,6 @@ def set_rcParams(plt, tex=False):
     plt.rcParams['figure.dpi'] = 200
     plt.rcParams['font.size'] = 8
     plt.rcParams['font.family'] = 'serif'
-    plt.rcParams['font.serif'] = ['Computer Modern Serif']
     plt.rcParams['lines.linewidth'] = .7
     plt.rcParams["ytick.color"] = "black"
     plt.rcParams["xtick.color"] = "black"
