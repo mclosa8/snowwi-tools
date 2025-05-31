@@ -96,20 +96,11 @@ run_channel() {
     echo "$args"
     echo "Config file: $config"
     echo "Band: $band"
-    if [[ ! -d "radar_data" ]]
-    then
-        echo "Link to radar_data directory not existing... Linking it..."
-        ln -s ../../../radar_data/chan$channel radar_data
-    else
-        echo "Link to radar_data exists."
-    fi
 
     cp $cwd/${azmcomp_dir}/$band/$channel/*.json . # Copies radar state & antenna patterns
     cp $cwd/${azmcomp_dir}/${band}/$channel/*cfg . # Copies all configs
-        
-    slc="${cwd}/${azmcomp_dir}/${band}/${channel}/azmcomp.h5"
 
-    setup_debug.py $debug_file $config $slc -u -v 2>&1 | tee setup_debug.log
+    setup_debug_snowwi.py $debug_file $config -u 2>&1 | tee setup_debug.log
     error=$?
     if [[ "$error" != '0' ]]
     then
@@ -122,7 +113,7 @@ run_channel() {
         -n 25000 \
         -wd $cwd \
         -b "$band" \
-        -d $debug_file 2>&1 | tee azmcomp.log
+        -d "target_indices.txt" 2>&1 | tee azmcomp.log
 
     read_debug.py azmcomp.h5 radar_state.json 2>&1 | tee read_debug.log
 }
