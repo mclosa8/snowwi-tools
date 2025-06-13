@@ -61,7 +61,7 @@ then
 fi
 
 for i in {0..3}; do
-  ln -s "$configs_high/snowwi_azmcomp.cfg" "$processing_dir/config/high/snowwi_azmcomp_$i.cfg"
+  ln -s "$processing_dir/config/low/azmcomp_template.cfg" "$processing_dir/config/high/snowwi_azmcomp_$i.cfg"
 done
 
 # Low
@@ -73,7 +73,7 @@ then
 fi
 
 for i in {0..3}; do
-  ln -s "$configs_low/snowwi_azmcomp.cfg" "$processing_dir/config/low/snowwi_azmcomp_$i.cfg"
+  ln -s "$processing_dir/config/low/azmcomp_template.cfg" "$processing_dir/config/low/snowwi_azmcomp_$i.cfg"
 done
 
 tree -L 3 $processing_dir
