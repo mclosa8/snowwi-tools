@@ -11,9 +11,11 @@
         - v0: Initial version - Jul 18, 2025 - MCT
 """
 
-import sqlite3
-import os
 import csv
+import glob
+import os
+import pprint
+import sqlite3
 
 
 # === Central Schema Definition ===
@@ -206,6 +208,12 @@ def export_to_csv(conn):
 
 def main():
     print(WELCOME_MSG)
+    
+    dbs_in_curr_dir = glob.glob('*.db')
+
+    print("Databases in CWD:")
+    pprint.PrettyPrinter().pprint(dbs_in_curr_dir)
+
     db_path = input('Input flightline database path: ').strip()
     db_path = os.path.abspath(db_path)
 
