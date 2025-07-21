@@ -11,14 +11,17 @@
         - v0: Initial version - Jul 18, 2025 - MCT
 """
 
+import boto3
 import csv
 import glob
 import os
 import pprint
 import sqlite3
+import tempfile
+
+from urllib.parse import urlparse
 
 
-# === Central Schema Definition ===
 COLUMNS = [
     ("flightline_name", "TEXT NOT NULL"),
     ("folder_name", "TEXT NOT NULL UNIQUE"),
@@ -50,7 +53,13 @@ Choose an option:
 """
 
 def connect_db(db_path):
-    return sqlite3.connect(db_path)
+    if is_s3_path(db_path):
+        local_path, bucket, key = download_s3_to_tempfile(db_path)
+        conn = sqlite3.connect(local_path)
+        conn._original_s3_info = (local_path, bucket, key)  # stash for later upload
+        return conn
+    else:
+        return sqlite3.connect(db_path)
 
 
 def init_db(conn):
@@ -223,6 +232,33 @@ def print_table(rows):
         print(format_row(row))
 
 
+def is_s3_path(path):
+    return path.startswith("s3://")
+
+
+def parse_s3_path(s3_path):
+    parsed = urlparse(s3_path)
+    bucket = parsed.netloc
+    key = parsed.path.lstrip('/')
+    return bucket, key
+
+
+def download_s3_to_tempfile(s3_path):
+    bucket, key = parse_s3_path(s3_path)
+    s3 = boto3.client("s3")
+
+    temp_file = tempfile.NamedTemporaryFile(delete=False)
+    s3.download_fileobj(bucket, key, temp_file)
+    temp_file.flush()
+    return temp_file.name, bucket, key
+
+
+def upload_tempfile_to_s3(temp_path, bucket, key):
+    s3 = boto3.client("s3")
+    with open(temp_path, "rb") as f:
+        s3.upload_fileobj(f, bucket, key)
+
+
 def main():
     print(WELCOME_MSG)
     
@@ -255,9 +291,20 @@ def main():
             export_to_csv(conn)
         elif choice == "7":
             print("Exiting. Goodbye.")
+            # If this was an S3-backed DB, upload the modified local file
+            if hasattr(conn, "_original_s3_info"):
+                local_path, bucket, key = conn._original_s3_info
+                conn.close()
+                upload_tempfile_to_s3(local_path, bucket, key)
+                os.remove(local_path)
+                print(f"\nChanges saved and uploaded to s3://{bucket}/{key}")
+            else:
+                conn.close()
             break
         else:
             print("Invalid option. Try again.")
+    
+
 
 
 if __name__ == "__main__":
