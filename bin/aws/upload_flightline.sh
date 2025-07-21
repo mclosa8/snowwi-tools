@@ -33,7 +33,7 @@ shift
 aws_path=$1
 
 # Build full path to radar data: base_path/date/flightline
-path_to_radar_data="$base_path/$date/$flightline"
+path_to_radar_data="$base_path/$flightline"
 
 echo "Dry run mode: $dryrun"
 echo "Base path: $base_path"
@@ -65,7 +65,7 @@ else
 fi
 
 # Final S3 sync destination: bucket/aws_path/flightline/
-s3_target_path="s3://$bucket/$aws_path/$flightline/"
+s3_target_path="s3://$bucket/$aws_path/$date/$flightline/"
 
 echo "Preparing to sync: $path_to_radar_data → $s3_target_path"
 
