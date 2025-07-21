@@ -52,14 +52,38 @@ Choose an option:
     7) Exit
 """
 
+class S3BackedConnection:
+    def __init__(self, conn, local_path, bucket, key):
+        self._conn = conn
+        self._s3_info = (local_path, bucket, key)
+
+    def __getattr__(self, attr):
+        return getattr(self._conn, attr)
+
+    def close_and_upload(self):
+        local_path, bucket, key = self._s3_info
+        self._conn.close()
+        upload_tempfile_to_s3(local_path, bucket, key)
+        os.remove(local_path)
+        print(f"Changes saved and uploaded to s3://{bucket}/{key}")
+
+    def __enter__(self):
+        self._conn.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._conn.__exit__(exc_type, exc_val, exc_tb)
+
+
+
 def connect_db(db_path):
     if is_s3_path(db_path):
         local_path, bucket, key = download_s3_to_tempfile(db_path)
         conn = sqlite3.connect(local_path)
-        conn._original_s3_info = (local_path, bucket, key)  # stash for later upload
-        return conn
+        return S3BackedConnection(conn, local_path, bucket, key)
     else:
         return sqlite3.connect(db_path)
+
 
 
 def init_db(conn):
@@ -268,7 +292,6 @@ def main():
     pprint.PrettyPrinter().pprint(dbs_in_curr_dir)
 
     db_path = input('Input flightline database path: ').strip()
-    db_path = os.path.abspath(db_path)
 
     conn = connect_db(db_path)
     init_db(conn)
@@ -291,16 +314,13 @@ def main():
             export_to_csv(conn)
         elif choice == "7":
             print("Exiting. Goodbye.")
-            # If this was an S3-backed DB, upload the modified local file
-            if hasattr(conn, "_original_s3_info"):
-                local_path, bucket, key = conn._original_s3_info
-                conn.close()
-                upload_tempfile_to_s3(local_path, bucket, key)
-                os.remove(local_path)
-                print(f"\nChanges saved and uploaded to s3://{bucket}/{key}")
+            # Deal with s3 connections
+            if isinstance(conn, S3BackedConnection):
+                conn.close_and_upload()
             else:
                 conn.close()
             break
+
         else:
             print("Invalid option. Try again.")
     
