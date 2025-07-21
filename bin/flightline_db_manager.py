@@ -89,8 +89,7 @@ def list_entries(conn):
     cursor.execute("SELECT * FROM flightlines ORDER BY folder_name")
     rows = cursor.fetchall()
     print("\nCurrent Flightlines (ordered by folder_name):\n")
-    for row in rows:
-        print(row)
+    print_table(rows)
 
 
 def add_entry(conn):
@@ -173,20 +172,18 @@ def edit_entry(conn):
 def search_entries(conn):
     print("\nSearch Entries (by date, flightline name, or keyword in notes)")
     keyword = input("Enter date (YYYY-MM-DD), flightline name, or keyword: ").strip()
+
     cursor = conn.cursor()
-    cursor.execute(f"""
+    cursor.execute("""
         SELECT * FROM flightlines
         WHERE flight_date LIKE ?
            OR flightline_name LIKE ?
            OR notes LIKE ?
     """, (f"%{keyword}%", f"%{keyword}%", f"%{keyword}%"))
     rows = cursor.fetchall()
-    if not rows:
-        print("No matching entries found.\n")
-    else:
-        print("\nMatching Entries:\n")
-        for row in rows:
-            print(row)
+
+    print("\nMatching Entries:\n")
+    print_table(rows)
 
 
 def export_to_csv(conn):
@@ -204,6 +201,26 @@ def export_to_csv(conn):
         print(f"Exported to {path}.\n")
     except Exception as e:
         print(f"Failed to export: {e}")
+
+def print_table(rows):
+    if not rows:
+        print("No entries found.\n")
+        return
+
+    headers = ["id"] + COLUMN_NAMES
+    data = [headers] + [list(map(str, row)) for row in rows]
+
+    # Compute max width per column
+    col_widths = [max(len(str(item)) for item in col) for col in zip(*data)]
+
+    def format_row(row):
+        return " | ".join(item.ljust(width) for item, width in zip(row, col_widths))
+
+    print(format_row(headers))
+    print("-" * (sum(col_widths) + 3 * (len(col_widths) - 1)))
+
+    for row in data[1:]:
+        print(format_row(row))
 
 
 def main():
