@@ -27,7 +27,7 @@ def compensate_range_loss(data, range_bins, order=1):
     return data*range_bins**order
 
 
-def compress(data, f_h, f_l, tp, fs, type='down', window='hamming', pulse='causal'):
+def compress(data, f_h, f_l, tp, fs, type='down', window='hamming', pulse='causal', precision='double'):
     n = int(fs*tp)
 
     if pulse == 'non-causal':
@@ -49,7 +49,13 @@ def compress(data, f_h, f_l, tp, fs, type='down', window='hamming', pulse='causa
         print('No windowing applied...')
 
     # print('Allocating memory...')
-    compressed_data = np.zeros_like(data, dtype=np.complex64)
+    if precision == 'single':
+        dtype = np.complex64
+        print(precision)
+    else:
+        dtype = np.complex128
+        print(precision)
+    compressed_data = np.zeros_like(data, dtype=dtype)
     # print('Memory allocated.')
 
     ctr = 0

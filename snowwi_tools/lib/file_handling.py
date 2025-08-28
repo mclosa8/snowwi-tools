@@ -86,7 +86,7 @@ def read_and_compress_aws(bucket, key, local_path,
 
 def read_and_compress_local(data_path,
                             N, header_samples, skip_samples, last_samp,
-                            chirp, window, filter, data_only: bool
+                            chirp, window, filter, data_only: bool, precision='double'
                             ):
     # print(data_path)
     # print(N, header_samples, skip_samples, last_samp)
@@ -113,7 +113,8 @@ def read_and_compress_local(data_path,
                                chirp['tp'],
                                chirp['fs'],
                                type=chirp['chirp_type'],
-                               window=window)[:, skip_samples:]
+                               window=window,
+                               precision)[:, skip_samples:]
     # print('Data compressed.')
     del (reshaped_data)
 
