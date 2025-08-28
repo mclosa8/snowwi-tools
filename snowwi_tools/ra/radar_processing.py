@@ -51,10 +51,8 @@ def compress(data, f_h, f_l, tp, fs, type='down', window='hamming', pulse='causa
     # print('Allocating memory...')
     if precision == 'single':
         dtype = np.complex64
-        print(precision)
     else:
         dtype = np.complex128
-        print(precision)
     compressed_data = np.zeros_like(data, dtype=dtype)
     # print('Memory allocated.')
 

@@ -114,7 +114,7 @@ def read_and_compress_local(data_path,
                                chirp['fs'],
                                type=chirp['chirp_type'],
                                window=window,
-                               precision)[:, skip_samples:]
+                               precision=precision)[:, skip_samples:]
     # print('Data compressed.')
     del (reshaped_data)
 
