@@ -61,6 +61,8 @@ def set_rcParams(plt, tex=False):
     plt.rcParams["xtick.color"] = "black"
     plt.rcParams["axes.labelcolor"] = "black"
     plt.rcParams["axes.edgecolor"] = "black"
+    plt.rcParams["grid.linestyle"] = '--'
+    plt.rcParams["grid.linewidth"]
     if tex:
         plt.rcParams['text.usetex'] = True
 
