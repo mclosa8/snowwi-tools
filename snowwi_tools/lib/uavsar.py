@@ -8,11 +8,12 @@
     Changelog:
         - v0: Initial version. Sept 03, 2025 - MCT
         - v1: Added functions to open GRD and SCH UAVSAR filetypes. Sept 04, 2025 - MCT
+        - v2: Added functions to rasterize scenes. Sept 09, 2025 - MCT
 """
 import numpy as np
 
+from osgeo import gdal, osr
 import os
-import rasterio
 import re
 import sys
 
@@ -163,13 +164,14 @@ def parse_uavsar_annotation_file(path: str, **kwargs) -> Dict[str, Dict[str, Any
         return parse_uavsar_annotation(f.read(), **kwargs)
 
 
-def open_uavsar_binary(fname, n_cols, format=np.float32):
+def open_uavsar_binary(fname, n_cols, format=np.float32, nan=-10000.0):
     samps = np.fromfile(fname, dtype=format).reshape((-1, n_cols))
+    samps[samps==nan] = np.nan
     print(samps.shape)
     return samps
 
 
-def open_uavsar_grd_files(data_fname):
+def open_uavsar_grd_files(data_fname, nan=-10000.0):
     filename, product_coords = os.path.splitext(data_fname) # filename will be sth like /a/long/path/to/flightline_name.product
     filename = filename.split('/')[-1] # Now flightline_name.product_type
     flightline, product_type = os.path.splitext(filename)
@@ -182,18 +184,6 @@ def open_uavsar_grd_files(data_fname):
     
     ann_dict = parse_uavsar_annotation_file(ann_filename, product_ext=product_coords)['flat']
 
-    ul = (
-        ann_dict['approximate_upper_left_latitude'],
-        ann_dict['approximate_upper_left_longitude']
-    )
-
-    lr = (
-        ann_dict['approximate_lower_right_latitude'],
-        ann_dict['approximate_lower_right_longitude']
-    )
-
-    ullr = (ul, lr)
-
     grd_spacing = (
         ann_dict['grd_latitude_spacing'],
         ann_dict['grd_longitude_spacing']
@@ -203,6 +193,17 @@ def open_uavsar_grd_files(data_fname):
         ann_dict['grd_latitude_lines'],
         ann_dict['grd_longitude_samples']
     ) # Latitude samples, longitude samples
+
+    ul = (
+        ann_dict['grd_starting_latitude'],
+        ann_dict['grd_starting_longitude']
+    )
+
+    lr = (
+        ul[0] + grd_samps[0] * grd_spacing[0],
+        ul[1] + grd_samps[1] * grd_spacing[1]
+    )
+    ullr = (ul, lr)
 
     grd_params = {
          "ullr": ullr,
@@ -215,7 +216,7 @@ def open_uavsar_grd_files(data_fname):
     return flightline, data, grd_params
 
 
-def open_uavsar_sch_files(data_fname):
+def open_uavsar_sch_files(data_fname, nan=-10000.0):
     filename, product_coords = os.path.splitext(data_fname) # filename will be sth like /a/long/path/to/flightline_name.product
     filename = filename.split('/')[-1] # Now flightline_name.product_type
     flightline, product_type = os.path.splitext(filename)
@@ -227,7 +228,6 @@ def open_uavsar_sch_files(data_fname):
     print(f"    Ann file: {ann_filename}")
     
     ann_dict = parse_uavsar_annotation_file(ann_filename, product_ext=product_coords)['flat']
-    pp.pprint(ann_dict)
 
     peg = (
         ann_dict['peg_latitude'],
@@ -263,10 +263,105 @@ def open_uavsar_sch_files(data_fname):
     return flightline, data, sch_params
 
 
-def uavsar_to_tiff(data, lat, lon):
-    shape = data.shape
+def array2raster(raster_fname, raster_origin, pixel_resolution, data):
+    """
+        Converts array into raster file using GDAL.
+        Source: https://pcjericks.github.io/py-gdalogr-cookbook/raster_layers.html#create-raster-from-array
 
-    lat_tile = 
+        Inputs:
+        -------
+            - raster_fname: Output raster filename
+            - raster_origin: Upper-left (lat, lon) in degrees.
+            - pixel_resolution: (lat, lon) pixel resolution in degrees.
+            - data: Array to convert.
+    """
+    rows, cols = data.shape
+
+    origin_lat, origin_lon = raster_origin
+
+    res_y, res_x = pixel_resolution
+
+    gtrans = (
+        origin_lon,     # Origin X
+        res_x,          # Pixel resolution X (pixel width)
+        0,
+        origin_lat,     # Origin Y
+        0,
+        res_y           # Pixel resolution Y (pixel height)
+    )
+
+    driver = gdal.GetDriverByName('GTiff')
+    out_raster = driver.Create(raster_fname, cols, rows, 1, gdal.GDT_Byte)
+    out_raster.SetGeoTransform(gtrans)
+    out_band = out_raster.GetRasterBand(1)
+    out_band.WriteArray(data)
+    out_raster_srs = osr.SpatialReference()
+    out_raster_srs.ImportFromEPSG(4326)
+    out_raster.SetProjection(out_raster_srs.ExportToWkt())
+    out_band.FlushCache()
+
+
+def crop_to_bbox(_pass, bbox_ullr, buffer=0):
+    
+    data = _pass['data']
+    params = _pass['params']
+
+    print("Before: ", data.shape)
+
+    # Now make lat,lon vectors
+    lat = np.linspace(params['ullr'][0][0], params['ullr'][1][0], params['samples'][0])
+    lon = np.linspace(params['ullr'][0][1], params['ullr'][1][1], params['samples'][1])
+
+    assert abs(lat.min() - params['ullr'][1][0]) < 1e-9, "Incorrect lat vector"
+    assert abs(lat.max() - params['ullr'][0][0]) < 1e-9, "Incorrect lat vector"
+    assert abs(lon.min() - params['ullr'][0][1]) < 1e-9, "Incorrect lon vector"
+    assert abs(lon.max() - params['ullr'][1][1]) < 1e-9, "Incorrect lon vector"
+
+    assert data.shape == (lat.size, lon.size), "Incorrect data or lat/lon shape"
+
+    row_idxs = np.where((bbox_ullr[1][0] <= lat) & (lat <= bbox_ullr[0][0]))[0]
+    col_idxs = np.where((bbox_ullr[0][1] <= lon ) & (lon <= bbox_ullr[1][1]))[0]
+
+    cropped = data[row_idxs[0]:row_idxs[-1], col_idxs[0]:col_idxs[-1]]
+    print("After: ", cropped.shape)
+
+    return {
+        'data': cropped,
+        'ullr': bbox_ullr,
+        'spacing': np.array(params['spacing'])
+    }
+
+
+def get_bbox_flightline(passes):
+    bbox_ullr = np.empty((2, 2)) 
+
+    """
+        bbox_ullr = (
+            (ul_lat, ul_lon),
+            (lr_lat, lr_lon)
+        )
+    """
+
+    for i, pass_key in enumerate(passes.keys()):
+        _pass = passes[pass_key]
+        if i == 0:
+            bbox_ullr = np.array(_pass['params']['ullr'])
+        else:
+            ullr_pass = np.array(_pass['params']['ullr'])
+            ul = np.array(
+                (np.min((bbox_ullr[0][0], ullr_pass[0][0])),
+                np.max((bbox_ullr[0][1], ullr_pass[0][1]))),
+            )
+            lr = np.array(
+                (np.max((bbox_ullr[1][0], ullr_pass[1][0])),
+                np.min((bbox_ullr[1][1], ullr_pass[1][1]))),
+            )
+            bbox_ullr[0] = ul
+            bbox_ullr[1] = lr
+
+    print(bbox_ullr)
+    
+    return bbox_ullr
 
 if __name__ == "__main__":
     # TODO: improve argument handling
