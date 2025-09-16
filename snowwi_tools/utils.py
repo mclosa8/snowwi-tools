@@ -127,3 +127,10 @@ def wrap_to_half(data, value):
 
 def wrap_to_full(data, value):
     return data % value
+
+
+def dms_to_dd(deg, min, sec, dir):
+    dd = deg + min / 60 + sec / 3600
+    if dir.lower() in ['w', 's']:
+        dd *= -1
+    return dd

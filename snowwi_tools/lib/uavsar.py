@@ -171,16 +171,21 @@ def open_uavsar_binary(fname, n_cols, format=np.float32, nan=-10000.0):
     return samps
 
 
-def open_uavsar_grd_files(data_fname, nan=-10000.0):
+def open_uavsar_grd_files(data_fname, nan=-10000.0, open_prc=True):
     filename, product_coords = os.path.splitext(data_fname) # filename will be sth like /a/long/path/to/flightline_name.product
     filename = filename.split('/')[-1] # Now flightline_name.product_type
     flightline, product_type = os.path.splitext(filename)
 
-    ann_filename = data_fname.replace(product_type+product_coords, '.ann')
+    ann_filename = data_fname.replace(product_type + product_coords, '.ann')
+    prc_hgt_fname = data_fname.replace(product_type, '.prc')
 
     print("Opening GLISTIN GRD files:")
     print(f"    Data file: {data_fname}")
     print(f"    Ann file: {ann_filename}")
+    
+    if open_prc:
+        assert os.path.isfile(prc_hgt_fname)
+        print(f"    Prc file: {prc_hgt_fname}")
     
     ann_dict = parse_uavsar_annotation_file(ann_filename, product_ext=product_coords)['flat']
 
@@ -212,6 +217,10 @@ def open_uavsar_grd_files(data_fname, nan=-10000.0):
     }
 
     data = open_uavsar_binary(data_fname, grd_samps[1])
+
+    if open_prc:
+        prc = open_uavsar_binary(prc_hgt_fname, grd_samps[1])
+        return flightline, data, grd_params, prc
 
     return flightline, data, grd_params
 
@@ -305,6 +314,11 @@ def crop_to_bbox(_pass, bbox_ullr, buffer=0):
     
     data = _pass['data']
     params = _pass['params']
+    if 'prc' in _pass.keys():
+        prc = True
+        prc_data = _pass['prc']
+    else:
+        prc = False
 
     print("Before: ", data.shape)
 
@@ -324,6 +338,17 @@ def crop_to_bbox(_pass, bbox_ullr, buffer=0):
 
     cropped = data[row_idxs[0]:row_idxs[-1], col_idxs[0]:col_idxs[-1]]
     print("After: ", cropped.shape)
+
+    if prc:
+        cropped_prc = prc_data[row_idxs[0]:row_idxs[-1], col_idxs[0]:col_idxs[-1]]
+        assert cropped.shape == cropped_prc.shape, "Shape missmatch between hgt data and prc data."
+
+        return {
+            'data': cropped,
+            'prc': cropped_prc,
+            'ullr': bbox_ullr,
+            'spacing': np.array(params['spacing'])
+        }        
 
     return {
         'data': cropped,
@@ -362,6 +387,37 @@ def get_bbox_flightline(passes):
     print(bbox_ullr)
     
     return bbox_ullr
+
+
+def transform_to_epsg(ds, dst_epsg=4326):
+    # Source geotransform
+    gt = ds.GetGeoTransform()
+    
+    # Build spatial references
+    src = osr.SpatialReference()
+    src.ImportFromWkt(ds.GetProjection())
+
+    dst = osr.SpatialReference()
+    dst.ImportFromEPSG(dst_epsg)
+
+    transform = osr.CoordinateTransformation(src, dst)
+
+    cols = np.arange(ds.RasterXSize)
+    rows = np.arange(ds.RasterYSize)
+
+    xx, yy, = np.meshgrid(cols, rows)
+
+    x = gt[0] + xx * gt[1] + yy * gt[2]
+    y = gt[3] + xx * gt[4] + yy * gt[5]
+
+    coords = np.vstack((x.ravel(), y.ravel())).T
+
+    lonlat = transform.TransformPoints(coords)
+
+    lon = np.array([pt[0] for pt in lonlat]).reshape(xx.shape)
+    lat = np.array([pt[1] for pt in lonlat]).reshape(xx.shape)
+
+    return lat, lon
 
 if __name__ == "__main__":
     # TODO: improve argument handling
