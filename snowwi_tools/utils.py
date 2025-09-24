@@ -62,7 +62,7 @@ def set_rcParams(plt, tex=False):
     plt.rcParams["axes.labelcolor"] = "black"
     plt.rcParams["axes.edgecolor"] = "black"
     plt.rcParams["grid.linestyle"] = '--'
-    plt.rcParams["grid.linewidth"]
+    plt.rcParams["grid.linewidth"] = 0.7
     if tex:
         plt.rcParams['text.usetex'] = True
 
