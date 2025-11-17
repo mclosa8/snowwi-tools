@@ -447,7 +447,7 @@ def make_if_not_a_dir(path):
 
 
 def read_header(file, n_datasamps, n_headersamps, i):
-    print(i)
+    # print(i)
     return np.fromfile(
         file, dtype=np.uint16
     ).reshape(-1, int(n_datasamps + n_headersamps))[:, :n_headersamps]
