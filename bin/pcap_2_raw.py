@@ -12,6 +12,7 @@
 
     Changelog:
         - v0: Initial version. - Feb 14, 2025 - MCT
+        - v1: Changed directory creation so doesn't need timestamp. - Nov, 05, 2025 - MCT
 """
 
 import numpy as np
@@ -26,7 +27,7 @@ import datetime
 from time import sleep
 
 from snowwi_tools.lib.file_handling import make_if_not_a_dir
-from snowwi_tools.lib.utils import natural_keys
+from snowwi_tools.utils import natural_keys
 
 # Some constants Joe had hardcoded
 packets_per_file = 29343
@@ -56,7 +57,7 @@ def parse_args():
     arg_parser.add_argument('base_directory',
                             help="Path to the PCAP files to process.")
     arg_parser.add_argument('--use-arduino-time', '-at',
-                            default='True',
+                            default=False,
                             action='store_true',
                             help='Uses the arduino time from /base-directory/arduino_dump.log')
     arg_parser.add_argument('--save-to', '-st',
@@ -161,8 +162,11 @@ def main():
     if args.use_arduino_time:
         time, arduino_unix_ms = get_arduino_time(args.base_directory)
     else:
-        time_from_dir = base_name.split("_")[-1]
-        time = datetime.datetime.utcfromtimestamp(time_from_dir)
+        try:
+            time_from_dir = base_name.split("_")[-1]
+            time = datetime.datetime.utcfromtimestamp(int(time_from_dir))
+        except ValueError:
+            time = datetime.datetime(year=1999, month=1, day=1)
 
     print(time)
     dir_name = f"{time.year}{time.month:02}{time.day:02}T{time.hour:02}{time.minute:02}{time.second:02}"
@@ -179,7 +183,7 @@ def main():
     save_directory = os.path.join(save_directory, day_dir, dir_name)
 
     if not args.use_arduino_time:
-        save_directory += 'no_gps_time'
+        save_directory += '_no_gps_time'
     print(f"\n\n\nSaving parsed files to {save_directory}")
 
     # Make output directories
@@ -222,16 +226,11 @@ def main():
     j = 0
     packetsTotal = 0
 
-    for i in range(num_files):
-        if i == 0:
-            directory = filelist[0]
-            print(directory)
-        else:
-            directory = filelist[0] + str(i)
-            if i == 1:
-                print(directory)
+    for i, file in enumerate(filelist):
+        
+        print(file)
 
-        header, data0, data1, data2, data3 = pcap2numpy(directory)
+        header, data0, data1, data2, data3 = pcap2numpy(file)
         packetsTotal += packets_per_file
 
         if packetsTotal >= packets_per_new_file:

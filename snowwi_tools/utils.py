@@ -53,7 +53,7 @@ def read_spreadsheet(flightline_xl, sheet_name, maxcols=11):
 
 def set_rcParams(plt, tex=False):
     # Set the RC params
-    plt.rcParams['figure.dpi'] = 200
+    plt.rcParams['figure.dpi'] = 300
     plt.rcParams['font.size'] = 8
     plt.rcParams['font.family'] = 'serif'
     plt.rcParams['lines.linewidth'] = .7
@@ -65,6 +65,15 @@ def set_rcParams(plt, tex=False):
     plt.rcParams["grid.linewidth"] = 0.7
     if tex:
         plt.rcParams['text.usetex'] = True
+    else:
+        # Keep mathtext (the $...$ syntax) but make it use normal plot fonts
+        plt.rcParams['text.usetex'] = False
+        plt.rcParams['mathtext.default'] = 'regular'     # use normal text weight
+        plt.rcParams['mathtext.fontset'] = 'dejavuserif' # matches serif family
+        # optional: make sure font variants align with main family
+        plt.rcParams['mathtext.rm'] = 'DejaVu Serif'
+        plt.rcParams['mathtext.it'] = 'DejaVu Serif:italic'
+        plt.rcParams['mathtext.bf'] = 'DejaVu Serif:bold'
 
 
 def average_n_rows(matrix, n):
