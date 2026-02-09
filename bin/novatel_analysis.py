@@ -9,6 +9,7 @@
 
     Changelog:
         - v0: Feb 13, 2025
+        - v.1: Feb 09, 2026 - Changed color lines to gradient for ease of visualization. LLM used for line gradient skeleton.
 
 """
 
@@ -22,10 +23,11 @@ import utm
 import sys
 
 from argparse import ArgumentParser
-
+from matplotlib.collections import LineCollection
+from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from pprint import PrettyPrinter
 
-from snowwi_tools import file_handling
+from snowwi_tools.lib import file_handling
 from snowwi_tools.lib.novatel import read_novatel
 from snowwi_tools.lib.novatel import get_attitude_dictionary
 from snowwi_tools.lib.novatel import read_excel_database_and_get_date
@@ -86,6 +88,7 @@ def parse_args():
     if args.date.isdigit():
         args.date = int(args.date)
 
+    print(args)
         
     return args
 
@@ -156,7 +159,7 @@ def main():
         print(fl_info)
         
         subdir_name = fl_info['Complete ID'].replace("-", f"/{idx}_")
-        fl_image_path = os.path.join(f'{args.save_to}', 'imgs', f'{subdir_name}')
+        fl_image_path = os.path.join(f'{args.save_to}', f'{subdir_name}')
         print(f"Saving to: {fl_image_path}")
         if not os.path.exists(fl_image_path):
             print(f'{fl_image_path} does not exist. Creating it...')
@@ -171,7 +174,7 @@ def main():
             continue
         
 
-        # Full flight vs flightline
+        # Full flight vs flightline - LAT LON plot
         plt.figure()
         plt.plot(nv_df['Longitude'], nv_df['Latitude'])
         plt.plot(fl_df['llh'][1], fl_df['llh'][0], 'r')
@@ -191,36 +194,122 @@ def main():
             np.zeros_like(tcn_points[0])
         ))
 
-        # Big plot
+
+
+        # Big plot - 3D plot
         fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        plt.plot(tcn_points[0], tcn_points[1], tcn_points[2])
-        plt.plot(tcn_points[0, 0], tcn_points[1, 0], tcn_points[2, 0], '.g')
-        plt.plot(tcn_points[0, -1], tcn_points[1, -1], tcn_points[2, -1], '.r')
-        plt.plot(ideal_tcn[0], ideal_tcn[1], ideal_tcn[2])
-        ax.set_xlabel('Along-track - T (m)')
-        ax.set_ylabel('Cross-track - C (m)')
-        ax.set_zlabel('Height - N (m)')
+        ax = fig.add_subplot(111, projection="3d")
+
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+
+
+        # ---- Gradient line for tcn_points ----
+        xp = tcn_points[0]
+        yp = tcn_points[1]
+        zp = tcn_points[2]
+
+        points = np.column_stack([xp, yp, zp])
+        segments = np.stack([points[:-1], points[1:]], axis=1)
+
+        # Color along trajectory (index-based)
+        values = np.arange(len(xp) - 1)
+
+        lc = Line3DCollection(
+            segments,
+            cmap="RdYlGn_r",
+            linewidths=1,
+            alpha=1,
+        )
+        lc.set_array(values)
+
+        ax.add_collection(lc)
+
+
+        # Ideal trajectory (plain line)
+        ax.plot(
+            ideal_tcn[0],
+            ideal_tcn[1],
+            ideal_tcn[2],
+            color="k",
+            linewidth=1,
+        )
+
+        # Start / end points
+        ax.plot(xp[0], yp[0], zp[0], ".g")
+        ax.plot(xp[-1], yp[-1], zp[-1], ".r")
+
+        # Labels and title
+        ax.set_xlabel("Along-track - T (m)")
+        ax.set_ylabel("Cross-track - C (m)")
+        ax.set_zlabel("Height - N (m)")
         plt.title(f"{fl_info['Complete ID']}")
 
+        # IMPORTANT: 3D collections do not autoscale
+        ax.set_xlim(xp.min(), xp.max())
+        ax.set_ylim(yp.min(), yp.max())
+        ax.set_zlim(zp.min(), zp.max())
+
         plt.savefig(f"{fl_image_path}/{fl_info['Complete ID']}_tcn_vs_ideal.png", dpi=300, bbox_inches='tight')
+
+
+
+        # Tube plot
         radius = 10
         theta = np.linspace(0, 2*np.pi, num=500)
         x = radius * np.cos(theta)
         y = radius * np.sin(theta)
 
+        # Tube
         plt.figure(figsize=(3*1.5, 4*1.5))
         plt.subplot(211)
+
+        # Regular line
         plt.plot(x, y, 'k', label=f'Radius: {radius}m.')
-        plt.plot(tcn_points[1], tcn_points[2])
-        plt.plot(tcn_points[1, 0], tcn_points[2, 0], '.g')
-        plt.plot(tcn_points[1, -1], tcn_points[2, -1], '.r')
+        plt.plot(0, 0, '+k')
+
+        # ---- Gradient line for tcn_points ----
+        xp = tcn_points[1]
+        yp = tcn_points[2]
+
+        points = np.column_stack([xp, yp])
+        segments = np.stack([points[:-1], points[1:]], axis=1)
+
+        # Color along the path (index-based)
+        values = np.arange(len(xp) - 1)
+
+        lc = LineCollection(segments, cmap="RdYlGn_r", linewidths=1, alpha=1)
+        lc.set_array(values)
+
+        ax = plt.gca()
+        ax.add_collection(lc)
+
+        # Start / end points
+        plt.plot(xp[0], yp[0], '.g')
+        plt.plot(xp[-1], yp[-1], '.r')
+
+        # Formatting
         plt.axis('equal')
         plt.grid(linestyle='--', linewidth=.7)
         plt.title(f"{fl_info['Complete ID']}")
         plt.xlabel('Cross-track - C (m)')
         plt.ylabel('Height - N (m)')
 
+        # Important: collections don’t autoscale
+        x_min = np.min([x.min(), xp.min()]) * 1.2
+        x_max = np.max([x.max(), xp.max()]) * 1.2
+
+        y_min = np.min([y.min(), yp.min()]) * 1.2
+        y_max = np.max([y.max(), yp.max()]) * 1.2
+
+        print(x_min, x_max)
+        print(y_min, y_max)
+
+        ax.set_xlim(x_min, x_max)
+        ax.set_ylim(y_min, y_max)
+
+        # Height - along track
         plt.subplot(413)
         plt.plot(ideal_tcn[0], np.ones_like(ideal_tcn[0])*radius, '--k')
         plt.plot(ideal_tcn[0], -np.ones_like(ideal_tcn[0])*radius, '--k')
@@ -236,7 +325,7 @@ def main():
         plt.ylabel('Height - N (m)')
         plt.ylim((-1.2*maxval, 1.2*maxval))
 
-
+        # Cross track - along track
         plt.subplot(414)
         plt.plot(ideal_tcn[0], np.ones_like(ideal_tcn[0])*radius, '--k')
         plt.plot(ideal_tcn[0], -np.ones_like(ideal_tcn[0])*radius, '--k')
@@ -256,38 +345,50 @@ def main():
         plt.tight_layout()
         plt.savefig(f"{fl_image_path}/{fl_info['Complete ID']}_tube.png", dpi=300, bbox_inches='tight')
 
-        # Now plot YPR
+
+
+        # YPR plot
+        ypr_range = 5 # NOTE: This is an arbitrary value for the YPR range.
+
         plt.figure()
+        # Yaw
         plt.subplot(311)
+        yaw_mean = np.mean(fl_df['ypr'][1][0])
         plt.plot(ideal_tcn[0], fl_df['ypr'][1][0], '--r',
-                label=f"{np.mean(fl_df['ypr'][1][0]):.2f} deg.")
+                label=f"{yaw_mean:.2f} deg.")
         plt.plot(ideal_tcn[0], fl_df['ypr'][0][0])
+        plt.ylim((yaw_mean - ypr_range, yaw_mean + ypr_range))
         plt.xlabel('Along-track - T (m)')
         plt.ylabel("(deg)")
         plt.grid(linestyle='--', linewidth=.7)
         plt.legend()
         plt.title('Yaw')
 
+        # Pitch
         plt.subplot(312)
+        pitch_mean = np.mean(fl_df['ypr'][1][1])
         plt.plot(ideal_tcn[0], fl_df['ypr'][1][1], '--r',
-                label=f"{np.mean(fl_df['ypr'][1][1]):.2f} deg.")
+                label=f"{pitch_mean:.2f} deg.")
         plt.plot(ideal_tcn[0], fl_df['ypr'][0][1])
         plt.xlabel('Along-track - T (m)')
         plt.ylabel("(deg)")
+        plt.ylim((pitch_mean - ypr_range, pitch_mean + ypr_range))
         plt.grid(linestyle='--', linewidth=.7)
         plt.legend()
         plt.title('Pitch')
 
+        # Roll
         plt.subplot(313)
+        roll_mean = np.mean(fl_df['ypr'][1][2])
         plt.plot(ideal_tcn[0], fl_df['ypr'][1][2], '--r',
-                label=f"{np.mean(fl_df['ypr'][1][2]):.2f} deg.")
+                label=f"{roll_mean:.2f} deg.")
         plt.plot(ideal_tcn[0], fl_df['ypr'][0][2])
         plt.xlabel('Along-track - T (m)')
         plt.ylabel("(deg)")
         plt.grid(linestyle='--', linewidth=.7)
         plt.legend()
         plt.title('Roll')
-
+        plt.ylim((roll_mean - ypr_range, roll_mean + ypr_range))
         plt.suptitle(f"{fl_info['Complete ID']}")
         plt.tight_layout()
 
