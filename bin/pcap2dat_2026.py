@@ -15,6 +15,7 @@
             - v0.1: Changed directory creation so doesn't need timestamp. - Nov, 05, 2025 - MCT
 
         - v1: Adaptation to SNOWWI-v2026. New timestamp implemented so it uses GPS time from the data stream and assigns ms recursively. Feb 10, 2026 - MCT
+            - v1.1: Included timestamp checking and fixing for any inconsistent timestamping at the beginning of collection (I.e, NMEA message does not show up.). Feb 11, 2026 - MCT
 """
 
 import numpy as np
@@ -89,6 +90,70 @@ def parse_args():
     args.no_metadata = not args.no_metadata
 
     return args
+
+# Keep Reading the first pulse from each pcap file until a changes in the timestamp is detected
+
+def gettime(data0):
+    tod_hhmmss_0 = data0[4].astype(np.uint16)
+    tod_hhmmss_1 = data0[5].astype(np.uint16)
+    tod_hhmmss_2 = data0[6].astype(np.uint16)
+    ##Get tod int
+    ascii_sequence = np.array([tod_hhmmss_0,  tod_hhmmss_1,  tod_hhmmss_2])
+    hhmmss = (np.stack([(ascii_sequence >> 8) & 0xFF, ascii_sequence & 0xFF], axis=-1).reshape(-1, 6) - ord('0'))[0]
+    #hhmmss
+    try:
+        ss = int(hhmmss[0] * 10 + hhmmss[1])
+        mm = int(hhmmss[2] * 10 + hhmmss[3])
+        hh = int(hhmmss[4] * 10 + hhmmss[5])
+    except:
+        ss = 0
+        mm = 0
+        hh = 0
+    ts = hh*60*60 + mm*60 + ss
+    return ts
+
+
+def check_timestamps(pcap_dirs):
+        print("Checking for timestamp correctness...")
+
+        limit = 100
+        iter = 0
+        while iter < limit:
+            # print("ITER", iter)
+            if iter == 0:
+                pcap_file = os.path.join(pcap_dirs, "raw_data.pcap")
+            else:
+                pcap_file = os.path.join(pcap_dirs, f"raw_data.pcap{iter}")
+            headerSize = 96
+            packets = np.fromfile(pcap_file, dtype=np.uint16)
+            packets = packets[12:]
+            fcs_tail = 2
+            packets = packets.reshape(-1, 32*53+8+fcs_tail).T[8:-fcs_tail].flatten()
+            full_burst_packets = packets.reshape(32*53,-1)
+
+            header_arr = full_burst_packets[:headerSize]
+            packet_count_lsb = header_arr[32].astype(np.uint32)
+            packet_count_msb = header_arr[33].astype(np.uint32)
+            packet_count = packet_count_lsb + (packet_count_msb << 16)
+            packet_count = (packet_count - 2)//6
+            #Find the first multiple of 250 in packet_count
+            multiples_idx = np.where(packet_count % 250 == 0)[0]
+
+            data = full_burst_packets[headerSize:][:8].T
+
+            if iter == 0:
+                tod_prev = gettime(data[multiples_idx[0]])
+                print(tod_prev)
+            for i in multiples_idx:
+                tod = gettime(data[i])
+                if tod_prev != tod:
+                    tod_final = tod - packet_count[i] // 250000 - 1
+                    # print(ts, i, packet_count[i])
+                    iter += limit
+                    break
+            iter += 1
+        print(tod_final)
+        return tod_final
 
 
 def time_2_num_pcap(time):
@@ -168,16 +233,7 @@ def parser_metadata(data0, data1, midnight, addms=0):
     # tod_seq_in is the first sample in header1
     tod_seq_in = data1[0].astype(np.uint16)
     
-    ##Get tod int
-    ascii_sequence = np.array([tod_hhmmss_0,  tod_hhmmss_1,  tod_hhmmss_2])
-    
-    d = (np.stack([(ascii_sequence >> 8) & 0xFF, ascii_sequence & 0xFF], axis=-1).reshape(-1, 6) - ord('0'))[0]
-    ss = int(d[0] * 10 + d[1])
-    mm = int(d[2] * 10 + d[3])
-    hh = int(d[4] * 10 + d[5])
-    
-    # Convert hhmmss to integer. Each is in ASCII
-    timeint = int(hh*3600 + mm*60 + ss)
+    timeint = gettime(data0)
     
     # Add TOD in seconds to midnight.
     ts_dt = midnight + datetime.timedelta(seconds=timeint)
@@ -403,6 +459,12 @@ def main():
     stream3 = []
     streamHeader = []
 
+    # Check the timestamps for correctness
+    tod_s = check_timestamps(args.base_directory)
+    tod_datetime = midnight + datetime.timedelta(seconds=float(tod_s))
+    ts_ms = int(datetime_to_gps_timestamp(tod_datetime)) * 1000
+    print(ts_ms)
+
     # Output file
     j = 0
     last_packet_count = 2
@@ -413,13 +475,14 @@ def main():
         
         print(file)
 
-        packeted = pcap2numpy(file, last_packet_count, midnight, total_samps=total_samples, parse_metaData=args.no)
+        packeted = pcap2numpy(file, last_packet_count, midnight, total_samps=total_samples, parse_metaData=args.no_metadata)
         header, data0, data1, data2, data3, last_packet_count, total_samples, packetsthisfile, metadata = packeted
         packetsTotal += packetsthisfile
 
-        # First file, get time and extrapolate
-        if i == 0:
-            ts_ms = metadata[0]
+        # First file, get time and extrapolate - NOTE: First timestamp is derived when checking for correctness and used from there.
+        # if i == 0:
+        #     ts_ms = metadata[0]
+        #     print(ts_ms)
 
         if packetsTotal >= packets_per_new_file:
             print("Packets Total Old: ", packetsTotal)
