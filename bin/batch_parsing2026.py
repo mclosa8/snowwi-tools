@@ -59,6 +59,12 @@ def parse_args():
                             nargs='+',
                             default=None,
                             help="First flightline or flightlines to parse. Will place them in the front of the parsing queue.")
+    arg_parser.add_argument('--exclude', '-ex',
+                            type=str,
+                            nargs='+',
+                            default=None,
+                            help="Exclude flightline or flightlines to parse. Will remove them from the parsing queue.")
+
 
     args = arg_parser.parse_args()
     args.base_directory = os.path.normpath(args.base_directory)
@@ -79,6 +85,18 @@ def move_to_front(paths, number):
                 return [paths[i]] + paths[:i] + paths[i+1:]
     
     return paths
+
+
+def remove_item(paths, number):
+    number = str(number)
+
+    result = []
+    for p in paths:
+        parts = p.split('/')
+        if not any(part.endswith(f"_{number}") for part in parts):
+            result.append(p)
+
+    return result
 
 
 def main():
@@ -126,6 +144,10 @@ def main():
     if args.parse_first:
         for line in args.parse_first[::-1]:
             final_paths = move_to_front(final_paths, line)
+    
+    if args.exclude:
+        for line in args.remove:
+            final_paths = remove_item(final_paths, line)
 
     print(final_paths[0])
     print(final_paths[-1])
