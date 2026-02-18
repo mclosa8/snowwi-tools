@@ -130,6 +130,14 @@ def read_and_compress_local(data_path,
     }
 
 
+def read_and_compress_mp_helper(data_path, data_samps, head_samps, skip_samps, last_sample,
+                    chirp, window, filter, data_only, precision, out, idx0, idx1):
+    
+    out[idx0:idx1] = read_and_compress_local(data_path, data_samps, head_samps,
+                                         skip_samps, last_sample, chirp, window,
+                                         filter, data_only, precision)
+
+
 def get_timestamp_from_filename(filename):
     full = filename.split('_')[-1].split('.')[0]
     fract = filename.split('_')[-1].split('.')[1]
