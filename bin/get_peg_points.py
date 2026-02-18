@@ -12,17 +12,19 @@
         - v0.2: Fixed bug with NovAtel file naming inconsistencies - Feb 24, 2025 - MCT
 """
 
-from snowwi_tools.utils import read_spreadsheet, natural_keys
-from snowwi_tools.novatel import read_novatel, get_llh, get_cog
 import numpy as np
 import pandas as pd
 
+from snowwi_tools.utils import read_spreadsheet, natural_keys
+from snowwi_tools.lib.novatel import read_novatel, get_llh, get_cog
+
 import argparse
+import copy
 import glob
 
 import pprint
-pp = pprint.PrettyPrinter(indent=4)
 
+pp = pprint.PrettyPrinter(indent=4)
 
 def parse_args():
     arg_parser = argparse.ArgumentParser()
@@ -50,6 +52,10 @@ def main():
         glob.glob(args.novatel_path + '/*.txt'), key=natural_keys)
     pp.pprint(novatel_files)
 
+    # Clean novatel files from possible pegs
+    novatel_files = [f for f in novatel_files if 'pegs' not in f]
+    pp.pprint(novatel_files)
+    
     # Read spreadsheet
     excel_df = read_spreadsheet(args.spreadsheet_file, args.campaign)
 
@@ -83,7 +89,7 @@ def main():
         print(band)
 
         # Iterate over flightlines in spreadsheet and save names to dict
-        fl_date = flightline_dict.copy()
+        fl_date = copy.deepcopy(flightline_dict)
 
         fl_info = excel_df.loc[(
             excel_df['Date (local)'] == date)].reset_index(drop=True)
@@ -110,10 +116,12 @@ def main():
             print(fl_id)
             # Gets rid of the last _1 if existent.
             clean_flid = fl_id.rsplit('_', 1)
-            # We don't refly the same line for more than 10 times.
-            if (clean_flid[0][-1].isdigit()) and (len(clean_flid[1]) == 1):
-                fl_id = clean_flid[0]
-                print(f"Cleaned FlID: {clean_flid}")
+            print(clean_flid)
+            if len(clean_flid) > 1:
+                # We don't refly the same line for more than 10 times.
+                if (clean_flid[0][-1].isdigit()) and (len(clean_flid[1]) == 1):
+                    fl_id = clean_flid[0]
+                    print(f"Cleaned FlID: {clean_flid}")
             print(f'\nProcessing flightline {fl_id}...')
 
             flightline = novatel_df.loc[(novatel_df['GPSSeconds'] >= row['Start']) & (
@@ -122,9 +130,9 @@ def main():
 
             # Retrieve ECEF coordinates
             llh = get_llh(flightline)
-            print(llh.shape)
+            # print(llh.shape)
             cog_heading = get_cog(flightline)
-            print(cog_heading.shape)
+            # print(cog_heading.shape)
 
             # And we column_stack llh and cog so the final tuple is (lat, lon, hei, cog_heading)
             llh = np.vstack((llh, cog_heading))
@@ -143,23 +151,30 @@ def main():
         all_dates[date] = fl_date
         pp.pprint(all_dates)
 
+
+    print(flightline_dict)
+
     # Now we iterate over all the dates and we average all the PEGs
     for date, date_dict in all_dates.items():
 
         # Now we iterate over the flightlines and average the PEGs
         for fl_id, value in date_dict.items():
-            print(value)
+            # print(value)
             pegs = np.array(value)
-            print(pegs)
+            # print(pegs)
             means = np.mean(pegs, axis=0)
-            print(means)
+            # print(means)
             flightline_dict[fl_id].append(means)
 
+    print('aaaa')
     pp.pprint(flightline_dict)
 
     # Now, one last time we iterate over all the flightlines and we average the PEGs
     for fl_id in flightline_dict.keys():
-        flightline_dict[fl_id] = np.mean(flightline_dict[fl_id], axis=0)
+        tmp = flightline_dict[fl_id]
+        # Clean nans
+        clean = [peg for peg in tmp if not np.isnan(peg).all()]
+        flightline_dict[fl_id] = np.mean(clean, axis=0)
 
     pp.pprint(flightline_dict)
     cleaned_dict = {
@@ -173,7 +188,9 @@ def main():
     sorted_keys.sort(key=natural_keys)
 
     # Finally, we write the dict to file
-    with open(f'pegs_{args.campaign.lower()}.txt', 'w') as f:
+    out_filename = f'pegs_{args.campaign.lower()}.txt'
+    with open(out_filename, 'w') as f:
+        print(f"\nWriting PEGs to {out_filename}...")
         f.write(
             f'Flightline_ID    PEG_LAT(deg)    PEG_LON(deg)    PEG_H-ELL(m)    PEG-Heading(deg)\n')
         for key in sorted_keys:
