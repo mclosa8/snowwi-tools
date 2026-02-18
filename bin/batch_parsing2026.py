@@ -64,13 +64,29 @@ def parse_args():
                             nargs='+',
                             default=None,
                             help="Exclude flightline or flightlines to parse. Will remove them from the parsing queue.")
+    arg_parser.add_argument('--parse-only', '-po',
+                            type=str,
+                            nargs='+',
+                            default=None,
+                            help="Flightlines to parse. Will parse all by default.")
 
 
     args = arg_parser.parse_args()
     args.base_directory = os.path.normpath(args.base_directory)
-    print(args.parse_first)
-    args.parse_first = [fl.split("_")[-1] for fl in args.parse_first]
-    print(args.parse_first)
+    if args.parse_first:
+        print(args.parse_first)
+        args.parse_first = [fl.split("_")[-1] for fl in args.parse_first]
+        print(args.parse_first)
+    
+    if args.exclude:
+        print(args.exclude)
+        args.exclude = [fl.split("_")[-1] for fl in args.exclude]
+        print(args.exclude)
+        
+    if args.parse_only:
+        print(args.exclude)
+        args.parse_only = [fl.split("_")[-1] for fl in args.parse_only]
+        print(args.parse_only)
 
     return args
 
@@ -98,6 +114,12 @@ def remove_item(paths, number):
 
     return result
 
+
+def intersection(paths, numbers):
+    def extract_number(path):
+        return path.rsplit('_', 1)[-1].split('/')[0]
+    numbers_set = set(numbers)
+    return [p for p in paths if extract_number(p) in numbers_set]
 
 def main():
 
@@ -146,8 +168,11 @@ def main():
             final_paths = move_to_front(final_paths, line)
     
     if args.exclude:
-        for line in args.remove:
+        for line in args.exclude:
             final_paths = remove_item(final_paths, line)
+
+    if args.parse_only:
+        final_paths = intersection(final_paths, args.parse_only)
 
     print(final_paths[0])
     print(final_paths[-1])

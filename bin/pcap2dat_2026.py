@@ -59,6 +59,9 @@ GPS_EPOCH = datetime.datetime(1980, 1, 6, 0, 0, 0)
 # Path constants
 CWD = os.getcwd()
 
+# PCAP file threshold - NOTE: 20 PCAP files is about 2000 pulses.
+PCAP_THRESHOLD = 20
+
 
 def parse_args():
 
@@ -391,6 +394,10 @@ def main():
     filelist.sort(key=natural_keys)
     print(len(filelist))
 
+    if len(filelist) < PCAP_THRESHOLD:
+        print(f"Invalid number of PCAP files. Expected: >{PCAP_THRESHOLD}. Existing: {len(filelist)}")
+        return
+
     # If arduino time definition - if arduino not used, uses time from directory name
     if args.use_arduino_time:
         time, arduino_unix_ms = get_arduino_time(args.base_directory)
@@ -548,10 +555,10 @@ def main():
                 # Will be set to zero to not interfere with range compression.
                 # Ch2 and Ch3 also set to zero for consistency.
 
-                stream0[:8] = 0
-                stream1[:8] = 0
-                stream2[:8] = 0
-                stream3[:8] = 0
+                stream0[:, :8] = 0
+                stream1[:, :8] = 0
+                stream2[:, :8] = 0
+                stream3[:, :8] = 0
 
                 stream0 = np.hstack([insert_arrays, stream0])
                 stream1 = np.hstack([insert_arrays, stream1])
