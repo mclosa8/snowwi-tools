@@ -6,7 +6,7 @@
     Automatically picks time when 4x2 started recording.
 
     Author(s): Marc Closa Tarres (MCT)
-               Joseph Maloyan
+               Joseph Maloyan (JJM)
     Date: 2025-02-14
     Version: v0
 
@@ -16,6 +16,7 @@
 
         - v1: Adaptation to SNOWWI-v2026. New timestamp implemented so it uses GPS time from the data stream and assigns ms recursively. Feb 10, 2026 - MCT
             - v1.1: Included timestamp checking and fixing for any inconsistent timestamping at the beginning of collection (I.e, NMEA message does not show up.). Feb 11, 2026 - MCT
+            - v1.2: Fixed edge case that made parsing fail. Feb 18, 2026 - JJM
 """
 
 import numpy as np
@@ -497,16 +498,16 @@ def main():
             print("Packets Total New: ", packetsTotal)
             print("Data0 length: ", data0.shape)
             print(packetsTotal * samples_per_packet)
-            stream0.append(data0[:-packetsTotal*samples_per_packet])
-            stream1.append(data1[:-packetsTotal*samples_per_packet])
-            stream2.append(data2[:-packetsTotal*samples_per_packet])
-            stream3.append(data3[:-packetsTotal*samples_per_packet])
-            streamHeader.append(header[:-packetsTotal*header_per_packet])
-            leftover_data0 = data0[-packetsTotal*samples_per_packet:]
-            leftover_data1 = data1[-packetsTotal*samples_per_packet:]
-            leftover_data2 = data2[-packetsTotal*samples_per_packet:]
-            leftover_data3 = data3[-packetsTotal*samples_per_packet:]
-            leftover_header = header[-packetsTotal*header_per_packet:]
+            stream0.append(data0[:-packetsTotal*samples_per_packet]) if packetsTotal != 0 else stream0.append(data0)
+            stream1.append(data1[:-packetsTotal*samples_per_packet]) if packetsTotal != 0 else stream1.append(data1)
+            stream2.append(data2[:-packetsTotal*samples_per_packet]) if packetsTotal != 0 else stream2.append(data2)
+            stream3.append(data3[:-packetsTotal*samples_per_packet]) if packetsTotal != 0 else stream3.append(data3)
+            streamHeader.append(header[:-packetsTotal*header_per_packet]) if packetsTotal != 0 else streamHeader.append(header)
+            leftover_data0 = data0[-packetsTotal*samples_per_packet:] if packetsTotal != 0 else []
+            leftover_data1 = data1[-packetsTotal*samples_per_packet:] if packetsTotal != 0 else []
+            leftover_data2 = data2[-packetsTotal*samples_per_packet:] if packetsTotal != 0 else []
+            leftover_data3 = data3[-packetsTotal*samples_per_packet:] if packetsTotal != 0 else []
+            leftover_header = header[-packetsTotal*header_per_packet:] if packetsTotal != 0 else []
             # If leftover_data has 0 as the first element in its shape, remove the last element from strea
             if leftover_data0.shape[0] == 0:
                 stream0.pop()
@@ -532,6 +533,7 @@ def main():
                 np.hstack(streamHeader).tofile(os.path.join(
                     hds, "streamHeader_" + str(j) + ".dat"))
             else:
+                print([len(s) for s in stream0])
                 stream0 = np.hstack(stream0).flatten()
                 stream1 = np.hstack(stream1).flatten()
                 stream2 = np.hstack(stream2).flatten()
@@ -578,7 +580,7 @@ def main():
                     hds, "streamHeader" + str(j) + ".dat"))
 
             j += 1
-            if leftover_data0.shape[0] != 0:
+            if len(leftover_data0) > 0:
                 stream0 = [leftover_data0]
                 stream1 = [leftover_data1]
                 stream2 = [leftover_data2]
@@ -588,7 +590,7 @@ def main():
                 stream1 = []
                 stream2 = []
                 stream3 = []
-            if leftover_header.shape[0] != 0:
+            if len(leftover_header) > 0:
                 streamHeader = [leftover_header]
             else:
                 streamHeader = []
