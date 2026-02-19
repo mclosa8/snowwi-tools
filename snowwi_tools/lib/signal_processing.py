@@ -12,7 +12,7 @@
 
 import numpy as np
 
-from scipy.signal import butter, filtfilt, sosfilt
+from scipy.signal import butter, filtfilt, sosfiltfilt
 
 
 def butter_bandpass(lowcut, highcut, fs, order=5):
@@ -25,20 +25,20 @@ def butter_bandpass(lowcut, highcut, fs, order=5):
 
 def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
     sos = butter_bandpass(lowcut, highcut, fs, order=order)
-    y = sosfilt(sos, data)
+    y = sosfiltfilt(sos, data)
     return y
 
 
 def butter_highpass(highcut, fs, order=5):
     nyq = 0.5 * fs
     high = highcut / nyq
-    sos = butter(order, high, analog=False, btype='high', output='ba')
+    sos = butter(order, high, analog=False, btype='high', output='sos')
     return sos
 
 
 def butter_highpass_filter(data, highcut, fs, order=5):
     b, a = butter_highpass(highcut, fs, order=order)
-    y = filtfilt(b, a, data)
+    y = sosfiltfilt(b, a, data)
     return y
 
 
@@ -51,7 +51,7 @@ def butter_lowpass(highcut, fs, order=5):
 
 def butter_lowpass_filter(data, highcut, fs, order=5):
     sos = butter_lowpass(highcut, fs, order=order)
-    y = sosfilt(sos, data)
+    y = sosfiltfilt(sos, data)
     return y
 
 
