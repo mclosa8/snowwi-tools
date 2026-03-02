@@ -508,16 +508,6 @@ def main():
             leftover_data2 = data2[-packetsTotal*samples_per_packet:] if packetsTotal != 0 else []
             leftover_data3 = data3[-packetsTotal*samples_per_packet:] if packetsTotal != 0 else []
             leftover_header = header[-packetsTotal*header_per_packet:] if packetsTotal != 0 else []
-            # If leftover_data has 0 as the first element in its shape, remove the last element from strea
-            if leftover_data0.shape[0] == 0:
-                stream0.pop()
-                stream1.pop()
-                stream2.pop()
-                stream3.pop()
-                print("Popped data")
-            if leftover_header.shape[0] == 0:
-                streamHeader.pop()
-                print("Popped header")
 
             # Save the data
             if not args.use_gps_time:

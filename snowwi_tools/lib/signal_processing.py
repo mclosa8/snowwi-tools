@@ -37,8 +37,8 @@ def butter_highpass(highcut, fs, order=5):
 
 
 def butter_highpass_filter(data, highcut, fs, order=5):
-    b, a = butter_highpass(highcut, fs, order=order)
-    y = sosfiltfilt(b, a, data)
+    sos = butter_highpass(highcut, fs, order=order)
+    y = sosfiltfilt(sos, data)
     return y
 
 
