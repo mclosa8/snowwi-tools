@@ -18,7 +18,7 @@ from multiprocessing import Pool
 from scipy.interpolate import CubicSpline
 
 from scipy.signal import correlate
-from snowwi_tools.lib.signal_processing import exp_chirp, butter_bandpass_filter
+from snowwi_tools.lib.signal_processing import exp_chirp, butter_bandpass_filter, butter_lowpass_filter
 
 from snowwi_tools.ra.data_handling import average_submatrix
 
@@ -66,6 +66,32 @@ def compress(data, f_h, f_l, tp, fs, type='down', window='hamming', pulse='causa
             # print(f"Counter: {ctr}")
 
     return compressed_data
+
+
+def downconvert(data, f_h, f_l, fs, window='hamming', decim=1, precision='double'):
+    fc = (f_h + f_l) / 2
+    bw = f_h - f_l
+
+    t = np.arange(data.shape[1]) / fs
+    lo = np.exp(-1j * 2 * np.pi * fc * t)
+
+    if window == 'hanning':
+        lo = lo * np.hanning(len(lo))
+    elif window == 'hamming':
+        lo = lo * np.hamming(len(lo))
+
+    dtype = np.complex64 if precision == 'single' else np.complex128
+    out_cols = data.shape[1] // decim
+    downconverted = np.zeros((data.shape[0], out_cols), dtype=dtype)
+
+    for ctr, row in enumerate(data):
+        mixed = row * lo
+        filtered = butter_lowpass_filter(mixed, bw / 2, fs)
+        if decim > 1:
+            filtered = filtered[::decim]
+        downconverted[ctr] = filtered
+
+    return downconverted
 
 
 def range_loss_correct(scene):

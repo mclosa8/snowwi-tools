@@ -16,6 +16,7 @@ import glob
 import os
 
 from snowwi_tools.lib.file_handling import get_headers_only
+import snowwi_tools.params as params
 
 from snowwi_tools.utils import natural_keys
 
@@ -82,17 +83,41 @@ def timestamp_to_week_seconds(gps_timestamp):  # gps_timestamp in s
     return {'Week': week, 'GPSSeconds': seconds}
 
 
-def timestamp_from_files(filename, n_datasamps: int = 100_000, n_headersamps: int = 4, mode='snowwi', output='unix'):
+def _timestamps_from_filenames(filelist, n_datasamps, n_headersamps, prf):
+    """Per-pulse GPS timestamps derived from filenames (Ettus: headers corrupted)."""
+    pulse_size = (n_datasamps + n_headersamps) * 2  # int16 = 2 bytes
+    ts_list = []
+    for f in filelist:
+        file_unix_ts = float(os.path.basename(f).split('_')[-1][:-4])
+        n_pulses = os.path.getsize(f) // pulse_size
+        ts_list.append(file_unix_ts + np.arange(n_pulses) / prf)
+    unix_ts = np.concatenate(ts_list)
+    return unix_ts - GPS_UNIX_EPOCH_DIFF + LEAP_SECONDS  # GPS time
+
+
+def timestamp_from_files(filename, n_datasamps=None, n_headersamps=None, mode='snowwi', output='unix'):
+    if mode not in ('snowwi', '4x2', 'ettus'):
+        raise ValueError(f"Unknown mode '{mode}'. Use 'snowwi', '4x2', or 'ettus'.")
+    if n_datasamps is None or n_headersamps is None:
+        if mode in ('snowwi', '4x2'):
+            daq = params.get_band_params_4x2('daq')
+        else:
+            daq = params.get_band_params_ettus('daq')
+        if n_datasamps is None:
+            n_datasamps = daq['data_samps']
+        if n_headersamps is None:
+            n_headersamps = daq['header_samps']
     if "*" in filename:  # List all files following a wildcard character
         filelist = glob.glob(os.path.abspath(filename))
         filelist = sorted(filelist, key=natural_keys)
     else:  # Assumed single file - TODO: improve this
         filelist = [filename]
-    headers = get_headers_only(filelist, n_datasamps, n_headersamps)
-    if mode == 'snowwi':
-        timestamps = timestamp_from_header_4x2(headers)  # In GPS time
+    if mode in ('snowwi', '4x2'):
+        headers = get_headers_only(filelist, n_datasamps, n_headersamps)
+        timestamps = timestamp_from_header_4x2(headers)  # GPS time
     elif mode == 'ettus':
-        timestamps = timestamp_from_header(headers)  # In GPS time
+        daq = params.get_band_params_ettus('daq')
+        timestamps = _timestamps_from_filenames(filelist, n_datasamps, n_headersamps, daq['prf'])  # GPS time
 
     if output == 'unix':
         # Unix = GPS Time + 315964800 - LEAP_SECONDS

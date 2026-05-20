@@ -98,12 +98,13 @@ def get_band_params_ettus(band, channel=None):
     if band == 'daq':
         return _BAND_PARAMS_ETTUS[band]
 
-    if channel not in _BAND_PARAMS_ETTUS[band]['channels']:
-        raise Exception("No valid channel selected.")
-
     params = _BAND_PARAMS_ETTUS[band].copy()
-    params['channel'] = eval(params['channels'][channel])
     del params['channels']
+
+    if channel is not None:
+        if channel not in _BAND_PARAMS_ETTUS[band]['channels']:
+            raise Exception("No valid channel selected.")
+        params['channel'] = eval(_BAND_PARAMS_ETTUS[band]['channels'][channel])
 
     return params
 

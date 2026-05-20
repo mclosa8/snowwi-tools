@@ -18,7 +18,7 @@ import os
 import sys
 import time
 
-from snowwi_tools.ra.radar_processing import compress
+from snowwi_tools.ra.radar_processing import compress, downconvert
 from snowwi_tools.lib.signal_processing import butter_bandpass_filter
 from snowwi_tools.utils import natural_keys
 
@@ -86,7 +86,9 @@ def read_and_compress_aws(bucket, key, local_path,
 
 def read_and_compress_local(data_path,
                             N, header_samples, skip_samples, last_samp,
-                            chirp, window, filter, data_only: bool, precision='double'
+                            chirp, window, filter, data_only: bool,
+                            precision='double', do_downconvert=False,
+                            scale_factor=1.0
                             ):
     # print(data_path)
     # print(N, header_samples, skip_samples, last_samp)
@@ -99,17 +101,28 @@ def read_and_compress_local(data_path,
                             header_samples=header_samples,
                             skip_samples=0,
                             truncate=last_samp)
-    reshaped_data = dict['data']
+
+    reshaped_data = dict['data'] * scale_factor
     headers = dict['headers']
     if filter is not None:
         reshaped_data = butter_bandpass_filter(
             reshaped_data, filter['lowcut'], filter['highcut'], filter['fs'])
 
+    if do_downconvert:
+        reshaped_data = downconvert(
+            reshaped_data, chirp['f_h'], chirp['f_l'], chirp['fs'])
+        bw = chirp['f_h'] - chirp['f_l']
+        f_h_ref = bw / 2
+        f_l_ref = -bw / 2
+    else:
+        f_h_ref = chirp['f_h']
+        f_l_ref = chirp['f_l']
+
     # print(f"Reshaped data shape: {reshaped_data.shape}")
     # print('Compressing data...')
     compressed_data = compress(reshaped_data,
-                               chirp['f_h'],
-                               chirp['f_l'],
+                               f_h_ref,
+                               f_l_ref,
                                chirp['tp'],
                                chirp['fs'],
                                type=chirp['chirp_type'],
@@ -131,11 +144,12 @@ def read_and_compress_local(data_path,
 
 
 def read_and_compress_mp_helper(data_path, data_samps, head_samps, skip_samps, last_sample,
-                    chirp, window, filter, data_only, precision, out, idx0, idx1):
-    
+                    chirp, window, filter, data_only, precision, do_downconvert, scale_factor,out, idx0, idx1):
+
     out[idx0:idx1] = read_and_compress_local(data_path, data_samps, head_samps,
                                          skip_samps, last_sample, chirp, window,
-                                         filter, data_only, precision)
+                                         filter, data_only, precision,
+                                         do_downconvert, scale_factor)
 
 
 def get_timestamp_from_filename(filename):
