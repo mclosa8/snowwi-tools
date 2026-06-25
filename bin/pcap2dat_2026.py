@@ -110,20 +110,24 @@ def gettime(data0):
         mm = int(hhmmss[2] * 10 + hhmmss[3])
         hh = int(hhmmss[4] * 10 + hhmmss[5])
     except:
-        ss = 0
-        mm = 0
-        hh = 0
+        return -1
+    if hh > 23 or mm > 59 or ss > 59:
+        return -1
     ts = hh*60*60 + mm*60 + ss
     return ts
 
 
 def check_timestamps(pcap_dirs):
         print("Checking for timestamp correctness...")
-
-        limit = 100
+        pcap_list = glob.glob(os.path.join(pcap_dirs, 'raw_data.pc*'))
+        n_pcaps = len(pcap_list)
+        print(n_pcaps)
+        limit = min(n_pcaps, 100)
         iter = 0
+        tod_final = 0
+        tod_prev = -1
+        found = False
         while iter < limit:
-            # print("ITER", iter)
             if iter == 0:
                 pcap_file = os.path.join(pcap_dirs, "raw_data.pcap")
             else:
@@ -140,22 +144,29 @@ def check_timestamps(pcap_dirs):
             packet_count_msb = header_arr[33].astype(np.uint32)
             packet_count = packet_count_lsb + (packet_count_msb << 16)
             packet_count = (packet_count - 2)//6
-            #Find the first multiple of 250 in packet_count
             multiples_idx = np.where(packet_count % 250 == 0)[0]
 
             data = full_burst_packets[headerSize:][:8].T
 
-            if iter == 0:
+            if tod_prev == -1:
                 tod_prev = gettime(data[multiples_idx[0]])
+                if tod_prev == -1:
+                    iter += 1
+                    continue
                 print(tod_prev)
             for i in multiples_idx:
                 tod = gettime(data[i])
+                if tod == -1:
+                    continue
                 if tod_prev != tod:
                     tod_final = tod - packet_count[i] // 250000 - 1
-                    # print(ts, i, packet_count[i])
+                    found = True
                     iter += limit
                     break
+                tod_prev = tod
             iter += 1
+        if not found:
+            print("Warning: No valid GPS timestamp transition found. Defaulting to 0.")
         print(tod_final)
         return tod_final
 
