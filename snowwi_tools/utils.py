@@ -109,7 +109,7 @@ def normalize(data):
     return (data/data.max())
 
 
-def vertical_colorbar(ax, im, label=""):
+def vertical_colorbar(ax, im, label="", size="5%"):
     from mpl_toolkits.axes_grid1 import make_axes_locatable
     """
     Adds a vertical colorbar next to an imshow plot and makes it match the plot height.
@@ -123,7 +123,7 @@ def vertical_colorbar(ax, im, label=""):
         cbar (matplotlib.colorbar.Colorbar): The created colorbar object.
     """
     divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.1)
+    cax = divider.append_axes("right", size=size, pad=0.1)
     cbar = ax.figure.colorbar(im, cax=cax)
     if label:
         cbar.set_label(label)

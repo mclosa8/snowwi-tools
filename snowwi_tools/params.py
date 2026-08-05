@@ -88,6 +88,56 @@ _BAND_PARAMS_4x2 = {
     'daq': {**_DAQ_PARAMS_4x2}
 }
 
+SIGNAL_PARAMS = {
+    'Grand Mesa': {
+        'Receive window': 21.5e-6,
+        'Receive delay': {
+            'nominal': {
+                'low': 9.00407e-6,
+                'high': 9.01546e-6, 
+                'c': 9.01139e-6,
+                },
+            'zero': {
+                'low': -12.49593e-6,
+                'high': -12.48454e-6, 
+                'c': -12.48861e-6
+                }
+            },
+        'Pulse length': 14e-6
+    },
+    'Test': {
+        'Receive window': 21.5e-6,
+        'Receive delay': {
+            'nominal': {
+                'low': 9.00407e-6,
+                'high': 9.01546e-6, 
+                'c': 9.01139e-6,
+                },
+            'zero': {
+                'low': -12.49593e-6,
+                'high': -12.48454e-6, 
+                'c': -12.48861e-6
+                }
+            },
+        'Pulse length': 14e-6
+    },
+    'Boise': {
+        'Receive window': 24e-6,
+        'Receive delay': {
+            'nominal': {
+                'low': 10.25895e-6,
+                'high': 10.27116e-6, 
+                'c': 10.25977e-6
+                },
+            'zero': {
+                'low': -13.741086e-6,
+                'high': -13.72884e-6, 
+                'c': -13.74023e-6
+            }
+        },
+        'Pulse length': 16.5e-6
+    }
+}
 
 def get_band_params_ettus(band, channel=None):
 

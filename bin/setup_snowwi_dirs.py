@@ -45,6 +45,12 @@ def parse_args():
         default=str(Path.home() / "data"),
         help="Data root directory (default: ~/data)",
     )
+    p.add_argument(
+        "--processing-subdir",
+        default="processing",
+        help="Output subdirectory under data-root (default: processing). "
+             "Use e.g. processing_v2 to avoid overwriting existing runs.",
+    )
     return p.parse_args()
 
 
@@ -86,7 +92,7 @@ def setup(args) -> None:
         sys.exit(f"No Novatel .txt files matching *{args.date}*.txt in {novatel_dir}")
 
     # Create processing directory
-    proc_dir = data_root / "processing" / args.date / args.flightline
+    proc_dir = data_root / args.processing_subdir / args.date / args.flightline
     proc_dir.mkdir(parents=True, exist_ok=True)
     print(f"Processing dir: {proc_dir}")
 

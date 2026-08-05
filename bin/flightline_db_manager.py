@@ -9,6 +9,14 @@
 
     Changelog:
         - v0: Initial version - Jul 18, 2025 - MCT
+
+    TODO:
+        - Add columns: elevation, speed (kn), heading & yaw.
+        - Retrieve flight date from the folder name. CAUTION: folder names are
+          UTC (YYYYMMDDThhmmss); a flight can be local-time one day and UTC the
+          next, so the UTC date may not match the local flight date. Handle the
+          UTC->local offset carefully instead of slicing the folder string.
+        - Add separators by year (?) when listing entries.
 """
 
 import boto3
@@ -28,7 +36,12 @@ COLUMNS = [
     ("flight_date", "TEXT NOT NULL"),
     ("start_local_time", "TEXT NOT NULL"),
     ("start_end_time", "TEXT NOT NULL"),
-    ("notes", "TEXT NOT NULL")
+    ("notes", "TEXT NOT NULL"),
+    # DAQ receive window actually used for this line, e.g. "21.5us" / "24us" /
+    # "0". Stored for reference; the processor only reads it as binary (== 0 ->
+    # calibration, else nominal) and pulls the real Receive Time Delay (s) from
+    # SIGNAL_PARAMS[region]['Receive delay'][nominal|zero][band].
+    ("rx_window", "TEXT")
     # Add more fields here as needed
 ]
 
@@ -95,6 +108,16 @@ def init_db(conn):
                 {col_defs}
             )
         """)
+        # Migrate existing tables: add any columns declared in COLUMNS that the
+        # live table is missing (CREATE TABLE IF NOT EXISTS won't add them).
+        existing = {row[1] for row in conn.execute("PRAGMA table_info(flightlines)")}
+        for name, ctype in COLUMNS:
+            if name not in existing:
+                # ALTER ADD COLUMN can't add UNIQUE / NOT NULL to an existing
+                # table, so drop those constraints for the added column.
+                simple = ctype.replace("NOT NULL", "").replace("UNIQUE", "").strip()
+                conn.execute(f"ALTER TABLE flightlines ADD COLUMN {name} {simple}")
+                print(f"Migrated: added column '{name}' to flightlines.")
 
 
 def recreate_table_ordered_by_folder(conn):

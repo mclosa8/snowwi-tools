@@ -12,7 +12,7 @@
 
 import numpy as np
 
-from scipy.signal import butter, filtfilt, sosfiltfilt
+from scipy.signal import butter, filtfilt, sosfiltfilt, fftconvolve
 
 
 def butter_bandpass(lowcut, highcut, fs, order=5):
@@ -23,9 +23,9 @@ def butter_bandpass(lowcut, highcut, fs, order=5):
     return sos
 
 
-def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
+def butter_bandpass_filter(data, lowcut, highcut, fs, order=5, axis=-1):
     sos = butter_bandpass(lowcut, highcut, fs, order=order)
-    y = sosfiltfilt(sos, data)
+    y = sosfiltfilt(sos, data, axis=axis)
     return y
 
 
@@ -66,3 +66,8 @@ def exp_chirp(t, f0, t1, f1, chirp_type, phi=0):
 
 def voltage_to_log_power(voltage):
     return 10 * np.log10(np.abs(voltage)**2)
+
+
+def rolling_average(data, N):
+    kernel = np.ones(N) / N
+    return fftconvolve(data, kernel, mode='same')
