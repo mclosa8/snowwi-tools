@@ -7,11 +7,16 @@ per-region config as it goes:
     setup -> novatel -> peg -> preprocess -> [output-map] -> azmcomp
           -> postprocess -> [estimate_height] -> [geolocate]
 
-Two modes, selected by whether a FLIGHTLINE is given:
+Two modes, selected by whether any FLIGHTLINE is given:
 
-* single flightline:  ``process_snowwi.py 20260129 GrandMesa2 -b low``
+* named flightlines:  ``process_snowwi.py 20260129 GrandMesa2 -b low``
+                      ``process_snowwi.py 20260129 GrandMesa02 GrandMesa03 -b c``
 * whole date:         ``process_snowwi.py 20260129 -b low --flightline-db DB``
   (iterates every flightline flown on that date, from the flightline DB).
+
+With more than one line, a failure is logged and the batch continues; a
+summary and non-zero exit follow at the end. Individual stage commands are
+retried once by default (``--retries``).
 
 Region (pulse length, receive delay, DEM) is inferred from the flightline name.
 Waveform parameters come from ``snowwi_tools.params.SIGNAL_PARAMS`` -- the
@@ -217,16 +222,32 @@ def match_peg(pegs, flightline):
 # Command / edit helpers (honour --dry-run)
 # --------------------------------------------------------------------------- #
 class Runner:
-    def __init__(self, dry_run=False):
+    def __init__(self, dry_run=False, retries=1):
         self.dry_run = dry_run
+        self.retries = retries
 
     def run(self, argv, cwd=None):
+        """Run a stage command, retrying `retries` times on non-zero exit.
+
+        The MIRSL stages recompute their outputs from scratch, so a re-run is
+        safe. This mainly papers over sporadic native crashes (e.g. the glibc
+        `malloc(): invalid next size` abort in predict_bounds) that clear on a
+        second attempt.
+        """
         argv = [str(a) for a in argv]
         loc = f" (cwd={cwd})" if cwd else ""
         print(f"  $ {' '.join(argv)}{loc}", flush=True)
         if self.dry_run:
             return
-        subprocess.run(argv, cwd=cwd, check=True)
+        for attempt in range(self.retries + 1):
+            try:
+                subprocess.run(argv, cwd=cwd, check=True)
+                return
+            except subprocess.CalledProcessError as e:
+                if attempt == self.retries:
+                    raise
+                print(f"  !! {argv[0]} failed (rc={e.returncode}); retry "
+                      f"{attempt + 1}/{self.retries}", flush=True)
 
     def edit(self, path, key, value):
         print(f"    edit {os.path.basename(path)}: {key} = {value}",
@@ -371,6 +392,11 @@ def _process_band(args, runner, band, work, flightline, signal_key, dem_file,
         azl, rnl = int(args.azm_looks), int(args.rng_looks)
         full_r = (az_sp, rng_sp)
         ml_r = (az_sp * azl, rng_sp * rnl)
+        # geolocate.py --looks = decimation of the input images relative to the
+        # config map, so the ML products need the postprocess look factors.
+        full_looks = args.geo_looks
+        ml_looks = [str(int(args.geo_looks[0]) * azl),
+                    str(int(args.geo_looks[1]) * rnl)]
         mll = f"{args.azm_looks}_{args.rng_looks}"
         for ch in channels:
             ch_dir = work / "postprocess" / band / str(ch)
@@ -378,23 +404,23 @@ def _process_band(args, runner, band, work, flightline, signal_key, dem_file,
             # full-res + ML calibrated SLC, geolocated
             _geolocate(runner, ch_dir, cfg, "azmcomp.h5",
                        "slc_calibrated.h5", "slc_distributed",
-                       "slc_cal_utm", args.geo_looks, full_r)
+                       "slc_cal_utm", full_looks, full_r)
             _geolocate(runner, ch_dir, cfg, "data_ml.h5",
                        f"slc_ml_{mll}.h5", "value",
-                       "slc_ml_utm", args.geo_looks, ml_r)
+                       "slc_ml_utm", ml_looks, ml_r)
             if args.power:
                 # full-res power (RCS dB)
                 runner.run(["slc_to_mag.py", "slc_calibrated.h5", "-p", "-lp",
                             "-o", "slc_mag_log.h5"], cwd=ch_dir)
                 _geolocate(runner, ch_dir, cfg, "azmcomp.h5",
                            "slc_mag_log.h5", "magnitude",
-                           "slc_mag_log_utm", args.geo_looks, full_r)
+                           "slc_mag_log_utm", full_looks, full_r)
                 # ML power (RCS dB)
                 runner.run(["slc_to_mag.py", f"slc_cal_ml_{mll}.h5", "-p", "-lp",
                             "-o", "slc_cal_ml_mag_log.h5"], cwd=ch_dir)
                 _geolocate(runner, ch_dir, cfg, "data_ml.h5",
                            "slc_cal_ml_mag_log.h5", "magnitude",
-                           "slc_cal_ml_mag_log_utm", args.geo_looks, ml_r)
+                           "slc_cal_ml_mag_log_utm", ml_looks, ml_r)
         print(f"    geolocate:{band}: {perf_counter() - t:.1f}s", flush=True)
 
 
@@ -445,25 +471,29 @@ def _pick_novatel_txt(work, date, dry_run):
 
 
 # --------------------------------------------------------------------------- #
-# Whole-date mode
+# Batch modes (explicit flightline list, or the whole date)
 # --------------------------------------------------------------------------- #
-def process_date(args, runner):
-    conn = fldb.connect_db(args.flightline_db)
-    rows = fldb.rows_for_date(conn, args.date)
-    if not rows:
-        sys.exit(f"No flightlines for date {args.date} in {args.flightline_db}")
-    print(f"Date {args.date}: {len(rows)} flightline(s) from DB", flush=True)
+def _work_name(seen, fl):
+    """Disambiguate duplicate flightline names: first keeps its name, the
+    2nd/3rd get _2/_3 appended to the output dir (identity stays `fl`)."""
+    seen[fl] = seen.get(fl, 0) + 1
+    return fl if seen[fl] == 1 else f"{fl}_{seen[fl]}"
+
+
+def run_lines(args, runner, entries, label):
+    """Process (flightline, folder, db_window, work_name) entries in order.
+
+    A single entry propagates its exception (traceback, exit 1); a batch keeps
+    going and reports a summary at the end.
+    """
+    if len(entries) == 1:
+        fl, folder, db_window, work_name = entries[0]
+        process_flightline(args, runner, fl, folder, db_window=db_window,
+                           work_name=work_name)
+        return
 
     failures = []
-    seen = {}
-    for row in rows:
-        fl = row["flightline_name"]
-        folder = row["folder_name"]
-        db_window = fldb.rx_window_of(row)
-        # Disambiguate duplicate flightline names: first keeps its name, the
-        # 2nd/3rd get _2/_3 appended to the output dir (identity stays `fl`).
-        seen[fl] = seen.get(fl, 0) + 1
-        work_name = fl if seen[fl] == 1 else f"{fl}_{seen[fl]}"
+    for fl, folder, db_window, work_name in entries:
         try:
             process_flightline(args, runner, fl, folder, db_window=db_window,
                                work_name=work_name)
@@ -471,13 +501,50 @@ def process_date(args, runner):
             print(f"!!! {work_name} FAILED: {e}", flush=True)
             failures.append((work_name, str(e)))
 
-    print("\n===== date summary =====", flush=True)
-    ok = len(rows) - len(failures)
-    print(f"  {ok}/{len(rows)} succeeded", flush=True)
+    print(f"\n===== {label} summary =====", flush=True)
+    print(f"  {len(entries) - len(failures)}/{len(entries)} succeeded",
+          flush=True)
     for fl, err in failures:
         print(f"  FAILED {fl}: {err}", flush=True)
     if failures:
         sys.exit(1)
+
+
+def process_date(args, runner):
+    """Every flightline flown on `date`, taken from the flightline DB."""
+    conn = fldb.connect_db(args.flightline_db)
+    rows = fldb.rows_for_date(conn, args.date)
+    if not rows:
+        sys.exit(f"No flightlines for date {args.date} in {args.flightline_db}")
+    print(f"Date {args.date}: {len(rows)} flightline(s) from DB", flush=True)
+
+    seen = {}
+    entries = [(row["flightline_name"], row["folder_name"],
+                fldb.rx_window_of(row),
+                _work_name(seen, row["flightline_name"]))
+               for row in rows]
+    run_lines(args, runner, entries, "date")
+
+
+def process_named(args, runner):
+    """The flightlines named on the command line, in the given order."""
+    names = args.flightlines
+    if args.radar_data is not None:  # single line, explicit dataset folder
+        entries = [(names[0], args.radar_data, None, names[0])]
+    else:
+        if not args.flightline_db:
+            sys.exit("Flightline names need --radar-data or --flightline-db")
+        conn = fldb.connect_db(args.flightline_db)
+        seen = {}
+        entries = []
+        for name in names:
+            row = fldb.lookup_flightline(conn, name, args.date)
+            entries.append((name, row["folder_name"], fldb.rx_window_of(row),
+                            _work_name(seen, name)))
+    if len(entries) > 1:
+        print(f"Date {args.date}: {len(entries)} flightline(s) requested",
+              flush=True)
+    run_lines(args, runner, entries, "batch")
 
 
 # --------------------------------------------------------------------------- #
@@ -488,8 +555,9 @@ def parse_args():
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("date", help="Flight date YYYYMMDD")
-    p.add_argument("flightline", nargs="?",
-                   help="Flightline name (omit to process the whole date)")
+    p.add_argument("flightlines", nargs="*", metavar="FLIGHTLINE",
+                   help="Flightline name(s), e.g. GrandMesa02 GrandMesa03 "
+                        "(omit to process the whole date)")
     p.add_argument("-b", "--band", dest="bands", required=True, nargs="+",
                    choices=["low", "high", "c"], metavar="BAND",
                    help="Band(s) to process, e.g. -b low  or  -b high c")
@@ -564,6 +632,9 @@ def parse_args():
                    help="Append geolocate to the default stages")
     p.add_argument("--dry-run", action="store_true",
                    help="Print commands and edits without executing")
+    p.add_argument("--retries", type=int, default=1, metavar="N",
+                   help="Re-run a failed stage command up to N times "
+                        "(default 1; 0 disables)")
 
     args = p.parse_args()
 
@@ -582,32 +653,24 @@ def parse_args():
                            float(args.output_map[2]))
     if "peg" in args.stages and not args.no_peg and not args.peg_file:
         p.error("peg stage needs --peg-file (or use --no-peg)")
-    if args.flightline is None and not args.flightline_db:
+    if not args.flightlines and not args.flightline_db:
         p.error("date mode (no FLIGHTLINE) needs --flightline-db")
+    if len(args.flightlines) > 1 and args.radar_data:
+        p.error("--radar-data names one dataset folder, so it can only be "
+                "used with a single flightline")
+    if args.retries < 0:
+        p.error("--retries must be >= 0")
     return args
 
 
 def main():
     args = parse_args()
-    runner = Runner(dry_run=args.dry_run)
+    runner = Runner(dry_run=args.dry_run, retries=args.retries)
 
-    if args.flightline is None:
+    if args.flightlines:
+        process_named(args, runner)
+    else:
         process_date(args, runner)
-        return
-
-    # single flightline: resolve radar folder
-    db_window = None
-    radar = args.radar_data
-    if radar is None:
-        if not args.flightline_db:
-            sys.exit("Single flightline needs --radar-data or --flightline-db")
-        conn = fldb.connect_db(args.flightline_db)
-        row = fldb.lookup_flightline(conn, args.flightline, args.date)
-        radar = row["folder_name"]
-        db_window = fldb.rx_window_of(row)
-
-    process_flightline(args, runner, args.flightline, radar,
-                       db_window=db_window)
 
 
 if __name__ == "__main__":
